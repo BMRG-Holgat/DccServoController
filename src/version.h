@@ -2,16 +2,16 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "0.3.0"
+#define SOFTWARE_VERSION "0.3.1"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 3
-#define VERSION_PATCH 0
+#define VERSION_PATCH 1
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define NUMERIC_VERSION 30
+#define NUMERIC_VERSION 31
 
 // Build information
-#define BUILD_DATE "2025-07-28"
+#define BUILD_DATE "2025-01-28"
 #define BUILD_TIME __TIME__
 
 // Project information
@@ -21,6 +21,16 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.3.1 (2025-01-28):\n" \
+"  + Fixed WiFi scan dropdown population issues\n" \
+"  + Enhanced WiFi scan JavaScript with proper newlines for browser compatibility\n" \
+"  + Integrated ArduinoJson library for robust JSON response formatting\n" \
+"  + Added CORS headers to WiFi scan endpoint for improved compatibility\n" \
+"  + Implemented test WiFi scan functionality for troubleshooting\n" \
+"  + Added invert value display to servo control table\n" \
+"  + Enhanced servo control table with comprehensive configuration view\n" \
+"  + Maintained mobile-responsive design with 7-column servo control table\n" \
+"\n" \
 "v0.3.0 (2025-07-28):\n" \
 "  + WiFi controller with Access Point and Station modes\n" \
 "  + Web-based configuration and servo control interface\n" \
@@ -76,11 +86,13 @@
 "• Web-based configuration and servo control\n" \
 "• Default AP: DCCAC_[MAC6] / PASS_[MAC6]\n" \
 "• User-configurable WiFi credentials (EEPROM stored)\n" \
-"• WiFi network scanning with dropdown selection\n" \
+"• Enhanced WiFi network scanning with improved browser compatibility\n" \
+"• Robust JSON response formatting with ArduinoJson library\n" \
+"• CORS headers for better web interface compatibility\n" \
 "• Factory reset function for complete settings reset\n" \
 "• Individual servo configuration save capability\n" \
+"• Comprehensive servo control table with invert status display\n" \
 "• Mobile-responsive web interface design\n" \
-"• Streamlined servo control table (no GPIO clutter)\n" \
 "• 4-speed movement control (Instant/Fast/Normal/Slow)\n" \
 "• Per-servo offset adjustment for center position\n" \
 "• Dual numbering system (servo 0-15 + GPIO pins)\n" \

@@ -265,7 +265,7 @@ void handleConfig() {
     html += ".button:disabled{background:#ccc;cursor:not-allowed;}";
     html += ".danger{background:#f44336;}";
     html += ".danger:hover{background:#da190b;}";
-    html += ".network-list{margin-top:10px;display:none;padding:10px;background:#f9f9f9;border-radius:6px;}";
+    html += ".network-list{margin-top:10px;padding:10px;background:#f9f9f9;border-radius:6px;}";
     html += ".button-group{display:flex;gap:10px;justify-content:center;margin:20px 0;}";
     html += "hr{margin:30px 0;border:none;border-top:1px solid #ddd;}";
     html += "@media (max-width:600px){";
@@ -305,6 +305,9 @@ void handleConfig() {
     html += "<select id='networkSelect' onchange='selectNetwork()' style='width:100%;margin-top:5px;'>";
     html += "<option value=''>Select a network...</option>";
     html += "</select>";
+    html += "<div style='margin-top:10px;'>";
+    html += "<button type='button' class='button' onclick='testScan()' style='background:#2196F3;'>Test Scan Response</button>";
+    html += "</div>";
     html += "</div>";
     html += "</div>";
     
@@ -344,61 +347,105 @@ void handleConfig() {
     html += "</form>";
     
     // JavaScript for WiFi scanning
-    html += "<script>";
-    html += "function scanWiFiNetworks() {";
-    html += "  const button = document.getElementById('scanBtn');";
-    html += "  const networkSelect = document.getElementById('networkSelect');";
-    html += "  const networkList = document.getElementById('networkList');";
-    html += "  ";
-    html += "  button.disabled = true;";
-    html += "  button.textContent = 'Scanning...';";
-    html += "  networkList.style.display = 'none';";
-    html += "  ";
-    html += "  fetch('/scan')";
-    html += "    .then(response => {";
-    html += "      if (!response.ok) {";
-    html += "        throw new Error('Network response was not ok');";
-    html += "      }";
-    html += "      return response.json();";
-    html += "    })";
-    html += "    .then(data => {";
-    html += "      console.log('Scan response:', data);";
-    html += "      ";
-    html += "      // Clear existing options";
-    html += "      networkSelect.innerHTML = '<option value=\"\">Select a network...</option>';";
-    html += "      ";
-    html += "      if (data.networks && data.networks.length > 0) {";
-    html += "        data.networks.forEach(network => {";
-    html += "          const option = document.createElement('option');";
-    html += "          option.value = network.ssid;";
-    html += "          option.textContent = network.ssid + ' (' + network.rssi + ' dBm, ' + network.encryption + ')';";
-    html += "          networkSelect.appendChild(option);";
-    html += "        });";
-    html += "        networkList.style.display = 'block';";
-    html += "        console.log('Found ' + data.networks.length + ' networks');";
-    html += "      } else {";
-    html += "        console.log('No networks found in response');";
-    html += "        alert('No networks found. Please try again.');";
-    html += "      }";
-    html += "    })";
-    html += "    .catch(error => {";
-    html += "      console.error('Error scanning networks:', error);";
-    html += "      alert('Error scanning networks: ' + error.message);";
-    html += "    })";
-    html += "    .finally(() => {";
-    html += "      button.disabled = false;";
-    html += "      button.textContent = 'Scan Networks';";
-    html += "    });";
-    html += "}";
-    html += "";
-    html += "function selectNetwork() {";
-    html += "  const networkSelect = document.getElementById('networkSelect');";
-    html += "  const stationSSID = document.getElementById('stationSSID');";
-    html += "  ";
-    html += "  if (networkSelect.value) {";
-    html += "    stationSSID.value = networkSelect.value;";
-    html += "  }";
-    html += "}";
+    html += "<script>\n";
+    html += "function scanWiFiNetworks() {\n";
+    html += "  console.log('WiFi scan button clicked');\n";
+    html += "  const button = document.getElementById('scanBtn');\n";
+    html += "  const networkSelect = document.getElementById('networkSelect');\n";
+    html += "  const networkList = document.getElementById('networkList');\n";
+    html += "  \n";
+    html += "  if (!button || !networkSelect || !networkList) {\n";
+    html += "    console.error('Required elements not found');\n";
+    html += "    return;\n";
+    html += "  }\n";
+    html += "  \n";
+    html += "  button.disabled = true;\n";
+    html += "  button.textContent = 'Scanning...';\n";
+    html += "  \n";
+    html += "  console.log('Starting WiFi scan...');\n";
+    html += "  fetch('/scan')\n";
+    html += "    .then(response => {\n";
+    html += "      console.log('Scan response status:', response.status);\n";
+    html += "      if (!response.ok) {\n";
+    html += "        throw new Error('Network response was not ok: ' + response.status);\n";
+    html += "      }\n";
+    html += "      return response.json();\n";
+    html += "    })\n";
+    html += "    .then(data => {\n";
+    html += "      console.log('Scan response data:', JSON.stringify(data));\n";
+    html += "      \n";
+    html += "      // Clear existing options\n";
+    html += "      networkSelect.innerHTML = '<option value=\"\">Select a network...</option>';\n";
+    html += "      \n";
+    html += "      if (data && data.networks && Array.isArray(data.networks) && data.networks.length > 0) {\n";
+    html += "        console.log('Processing', data.networks.length, 'networks');\n";
+    html += "        data.networks.forEach((network, index) => {\n";
+    html += "          console.log('Adding network:', network.ssid);\n";
+    html += "          const option = document.createElement('option');\n";
+    html += "          option.value = network.ssid;\n";
+    html += "          option.textContent = network.ssid + ' (' + network.rssi + ' dBm, ' + network.encryption + ')';\n";
+    html += "          networkSelect.appendChild(option);\n";
+    html += "        });\n";
+    html += "        console.log('Successfully added', data.networks.length, 'networks to dropdown');\n";
+    html += "      } else {\n";
+    html += "        console.log('No networks found in response or invalid data structure');\n";
+    html += "        networkSelect.innerHTML += '<option value=\"\" disabled>No networks found</option>';\n";
+    html += "      }\n";
+    html += "    })\n";
+    html += "    .catch(error => {\n";
+    html += "      console.error('Error scanning networks:', error);\n";
+    html += "      networkSelect.innerHTML += '<option value=\"\" disabled>Error scanning networks</option>';\n";
+    html += "      alert('Error scanning networks: ' + error.message);\n";
+    html += "    })\n";
+    html += "    .finally(() => {\n";
+    html += "      button.disabled = false;\n";
+    html += "      button.textContent = 'Scan Networks';\n";
+    html += "    });\n";
+    html += "}\n";
+    html += "\n";
+    html += "function selectNetwork() {\n";
+    html += "  console.log('Network selection changed');\n";
+    html += "  const networkSelect = document.getElementById('networkSelect');\n";
+    html += "  const stationSSID = document.getElementById('stationSSID');\n";
+    html += "  \n";
+    html += "  if (networkSelect && stationSSID && networkSelect.value) {\n";
+    html += "    console.log('Setting SSID to:', networkSelect.value);\n";
+    html += "    stationSSID.value = networkSelect.value;\n";
+    html += "  }\n";
+    html += "}\n";
+    html += "\n";
+    html += "function testScan() {\n";
+    html += "  console.log('Testing scan response...');\n";
+    html += "  const networkSelect = document.getElementById('networkSelect');\n";
+    html += "  \n";
+    html += "  // Simulate a successful scan response for testing\n";
+    html += "  const testData = {\n";
+    html += "    networks: [\n";
+    html += "      {ssid: 'TestNetwork1', rssi: -45, encryption: 'Secured', channel: 6},\n";
+    html += "      {ssid: 'TestNetwork2', rssi: -65, encryption: 'Open', channel: 11}\n";
+    html += "    ],\n";
+    html += "    count: 2\n";
+    html += "  };\n";
+    html += "  \n";
+    html += "  console.log('Test data:', JSON.stringify(testData));\n";
+    html += "  \n";
+    html += "  // Clear existing options\n";
+    html += "  networkSelect.innerHTML = '<option value=\"\">Select a network...</option>';\n";
+    html += "  \n";
+    html += "  if (testData && testData.networks && Array.isArray(testData.networks) && testData.networks.length > 0) {\n";
+    html += "    console.log('Processing', testData.networks.length, 'test networks');\n";
+    html += "    testData.networks.forEach((network, index) => {\n";
+    html += "      console.log('Adding test network:', network.ssid);\n";
+    html += "      const option = document.createElement('option');\n";
+    html += "      option.value = network.ssid;\n";
+    html += "      option.textContent = network.ssid + ' (' + network.rssi + ' dBm, ' + network.encryption + ')';\n";
+    html += "      networkSelect.appendChild(option);\n";
+    html += "    });\n";
+    html += "    console.log('Successfully added', testData.networks.length, 'test networks to dropdown');\n";
+    html += "  } else {\n";
+    html += "    console.log('Test data structure invalid');\n";
+    html += "  }\n";
+    html += "}\n";
     html += "</script>";
     
     html += "</div></body></html>";
@@ -517,7 +564,7 @@ void handleServoControl() {
     html += "h1{color:#333;text-align:center;margin-bottom:30px;}";
     html += ".nav-buttons{display:flex;gap:10px;justify-content:center;margin:20px 0;flex-wrap:wrap;}";
     html += ".table-container{overflow-x:auto;margin:20px 0;}";
-    html += "table{width:100%;border-collapse:collapse;min-width:700px;}";
+    html += "table{width:100%;border-collapse:collapse;min-width:800px;}";
     html += "th,td{padding:8px;text-align:center;border:1px solid #ddd;}";
     html += "th{background-color:#4CAF50;color:white;font-weight:bold;}";
     html += "tr:nth-child(even){background-color:#f9f9f9;}";
@@ -537,14 +584,14 @@ void handleServoControl() {
     html += ".container{margin:10px;padding:15px;}";
     html += "h1{font-size:24px;}";
     html += ".table-container{margin:15px -15px;}";
-    html += "table{font-size:12px;min-width:600px;}";
+    html += "table{font-size:12px;min-width:700px;}";
     html += "th,td{padding:6px 3px;}";
     html += ".button{padding:3px 6px;font-size:10px;margin:1px;}";
     html += ".nav-buttons{flex-direction:column;align-items:center;}";
     html += ".action-buttons{flex-direction:column;gap:1px;}";
     html += "}";
     html += "@media (max-width:480px){";
-    html += "table{font-size:10px;min-width:500px;}";
+    html += "table{font-size:10px;min-width:600px;}";
     html += "th,td{padding:4px 2px;}";
     html += ".button{padding:2px 4px;font-size:9px;}";
     html += "}";
@@ -567,6 +614,7 @@ void handleServoControl() {
     html += "<th>Swing (deg)</th>";
     html += "<th>Offset (deg)</th>";
     html += "<th>Speed</th>";
+    html += "<th>Invert</th>";
     html += "<th>Actions</th>";
     html += "</tr>";
     html += "</thead>";
@@ -580,6 +628,7 @@ void handleServoControl() {
         html += "<td>" + String(virtualservo[i].swing) + "</td>";
         html += "<td>" + String(virtualservo[i].offset) + "</td>";
         html += "<td>" + getSpeedString(virtualservo[i].speed) + "</td>";
+        html += "<td>" + String(virtualservo[i].invert ? "Yes" : "No") + "</td>";
         html += "<td>";
         html += "<div class='action-buttons'>";
         html += "<button class='button button-close' onclick='controlServo(" + String(i) + ", \"close\")'>Close</button>";
@@ -997,6 +1046,11 @@ void handleNotFound() {
 void handleWiFiScan() {
     Serial.println("WiFi scan requested");
     
+    // Set proper CORS headers to allow JavaScript access
+    webServer.sendHeader("Access-Control-Allow-Origin", "*");
+    webServer.sendHeader("Access-Control-Allow-Methods", "GET");
+    webServer.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+    
     // Ensure WiFi is in a good state for scanning
     if (WiFi.getMode() == WIFI_OFF) {
         WiFi.mode(WIFI_STA);
@@ -1008,7 +1062,10 @@ void handleWiFiScan() {
     
     Serial.printf("WiFi scan found %d networks\n", numNetworks);
     
-    String json = "{\"networks\":[";
+    // Use ArduinoJson for proper JSON formatting
+    DynamicJsonDocument doc(2048);
+    JsonArray networks = doc.createNestedArray("networks");
+    
     int validNetworks = 0;
     
     if (numNetworks > 0) {
@@ -1023,17 +1080,11 @@ void handleWiFiScan() {
                 continue;
             }
             
-            if (validNetworks > 0) json += ",";
-            
-            // Escape any quotes in SSID
-            ssid.replace("\"", "\\\"");
-            
-            json += "{";
-            json += "\"ssid\":\"" + ssid + "\",";
-            json += "\"rssi\":" + String(rssi) + ",";
-            json += "\"encryption\":\"" + String(encryption == WIFI_AUTH_OPEN ? "Open" : "Secured") + "\",";
-            json += "\"channel\":" + String(channel);
-            json += "}";
+            JsonObject network = networks.createNestedObject();
+            network["ssid"] = ssid;
+            network["rssi"] = rssi;
+            network["encryption"] = (encryption == WIFI_AUTH_OPEN) ? "Open" : "Secured";
+            network["channel"] = channel;
             
             validNetworks++;
             
@@ -1043,17 +1094,23 @@ void handleWiFiScan() {
         }
     }
     
-    json += "],\"count\":" + String(validNetworks) + "}";
+    doc["count"] = validNetworks;
     
     // Clean up scan results
     WiFi.scanDelete();
     
-    // Set proper headers for JSON response
-    webServer.sendHeader("Content-Type", "application/json");
-    webServer.sendHeader("Cache-Control", "no-cache");
-    webServer.send(200, "application/json", json);
+    // Serialize JSON to string
+    String jsonString;
+    serializeJson(doc, jsonString);
     
-    Serial.printf("WiFi scan response sent: %s\n", json.c_str());
+    // Set proper headers for JSON response
+    webServer.sendHeader("Content-Type", "application/json; charset=utf-8");
+    webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    webServer.sendHeader("Pragma", "no-cache");
+    webServer.sendHeader("Expires", "0");
+    webServer.send(200, "application/json", jsonString);
+    
+    Serial.printf("WiFi scan response sent: %s\n", jsonString.c_str());
 }
 
 void handleWiFiEvents() {
