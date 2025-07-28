@@ -30,6 +30,12 @@
 "  + Serial WiFi commands: wifi, ap, sta, factory\n" \
 "  + Web server on port 80 with responsive UI\n" \
 "  + Real-time servo control via web interface\n" \
+"  + WiFi network scanning with dropdown selection\n" \
+"  + Individual servo configuration save functionality\n" \
+"  + Mobile-responsive design for all web pages\n" \
+"  + Improved servo control table without GPIO references\n" \
+"  + Optimized layout with compact padding for better readability\n" \
+"  + UTF-8 character encoding support\n" \
 "  + Enhanced EEPROM storage (1024 bytes)\n" \
 "\n" \
 "v0.2.0 (2025-07-28):\n" \
@@ -70,12 +76,17 @@
 "• Web-based configuration and servo control\n" \
 "• Default AP: DCCAC_[MAC6] / PASS_[MAC6]\n" \
 "• User-configurable WiFi credentials (EEPROM stored)\n" \
+"• WiFi network scanning with dropdown selection\n" \
 "• Factory reset function for complete settings reset\n" \
+"• Individual servo configuration save capability\n" \
+"• Mobile-responsive web interface design\n" \
+"• Streamlined servo control table (no GPIO clutter)\n" \
 "• 4-speed movement control (Instant/Fast/Normal/Slow)\n" \
 "• Per-servo offset adjustment for center position\n" \
 "• Dual numbering system (servo 0-15 + GPIO pins)\n" \
 "• Comprehensive serial and web command interfaces\n" \
 "• EEPROM persistence for all settings (1024 bytes)\n" \
+"• UTF-8 character encoding support\n" \
 "• Modular architecture for easy maintenance\n" \
 "• PlatformIO build system with custom tools\n" \
 "• Complete documentation and GitHub integration"
