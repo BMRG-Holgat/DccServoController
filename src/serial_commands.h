@@ -19,5 +19,9 @@ void processServoConfigCommand();
 void processServoControlCommand();
 void processDccEmulationCommand();
 void processDisplayCommand();
+void processAPConfigCommand();
+void processStationConfigCommand();
+void processFactoryResetCommand();
+void processWiFiScanCommand();
 
 #endif // SERIAL_COMMANDS_H

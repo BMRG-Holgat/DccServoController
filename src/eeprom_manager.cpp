@@ -1,5 +1,6 @@
 #include "eeprom_manager.h"
 #include "servo_controller.h"
+#include "wifi_controller.h"
 #include "config.h"
 #include <EEPROM.h>
 
@@ -98,4 +99,79 @@ void putSettings() {
     
     Serial.println("Settings saved to EEPROM");
     bootController.isDirty = false;
+}
+
+void saveWiFiConfig() {
+    // WiFi config is stored after controller and servo data
+    int eeAddr = sizeof(bootController) + sizeof(virtualservo);
+    EEPROM.put(eeAddr, wifiConfig);
+    EEPROM.commit(); // ESP32 specific - commit changes to flash
+    Serial.println("WiFi configuration saved to EEPROM");
+}
+
+void loadWiFiConfig() {
+    // WiFi config is stored after controller and servo data
+    int eeAddr = sizeof(bootController) + sizeof(virtualservo);
+    
+    // Create a temporary structure to validate loaded data
+    WiFiConfig tempConfig;
+    EEPROM.get(eeAddr, tempConfig);
+    
+    // Check if the loaded config appears to be valid (magic number check would be better)
+    // For now, check if the mode is within valid range and enabled flag makes sense
+    bool configValid = (tempConfig.mode >= DCC_WIFI_OFF && tempConfig.mode <= DCC_WIFI_AP_STATION);
+    
+    if (configValid && strlen(tempConfig.apSSID) > 0) {
+        // Config appears valid, use it
+        wifiConfig = tempConfig;
+        Serial.println("WiFi configuration loaded from EEPROM");
+    } else {
+        // Config is invalid or uninitialized, set defaults
+        Serial.println("WiFi configuration invalid or uninitialized, setting defaults");
+        wifiConfig.enabled = true;
+        wifiConfig.mode = DCC_WIFI_AP;
+        memset(wifiConfig.stationSSID, 0, WIFI_SSID_MAX_LENGTH);
+        memset(wifiConfig.stationPassword, 0, WIFI_PASSWORD_MAX_LENGTH);
+        wifiConfig.useStaticIP = false;
+        
+        // Generate default AP credentials
+        generateDefaultCredentials();
+        
+        // Save the defaults to EEPROM
+        saveWiFiConfig();
+    }
+}
+
+void factoryResetAll() {
+    Serial.println("Performing factory reset of all settings...");
+    
+    // Reset controller to defaults
+    bootController = m_defaultController;
+    bootController.isDirty = true;
+    
+    // Reset all servos to factory defaults: servo,addr,swing,offset,speed,invert,continuous = 0,0,25,0,0,0
+    for (int i = 0; i < TOTAL_PINS; i++) {
+        virtualservo[i].pin = pwmPins[i];
+        virtualservo[i].address = 0;
+        virtualservo[i].swing = 25;
+        virtualservo[i].offset = 0;
+        virtualservo[i].speed = 0;  // Instant
+        virtualservo[i].invert = false;
+        virtualservo[i].continuous = false;
+        virtualservo[i].position = 90;  // Center position
+        virtualservo[i].state = SERVO_BOOT;
+    }
+    
+    // Reset WiFi configuration to defaults
+    generateDefaultCredentials();
+    wifiConfig.mode = DCC_WIFI_AP;
+    wifiConfig.enabled = true;
+    memset(wifiConfig.stationSSID, 0, WIFI_SSID_MAX_LENGTH);
+    memset(wifiConfig.stationPassword, 0, WIFI_PASSWORD_MAX_LENGTH);
+    
+    // Save all settings
+    putSettings();
+    saveWiFiConfig();
+    
+    Serial.println("Factory reset complete");
 }

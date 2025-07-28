@@ -4,6 +4,9 @@
 #include "config.h"
 #include "version.h"
 
+// Forward declaration of WiFiConfig to avoid circular dependency
+struct WiFiConfig;
+
 // Create numeric version for EEPROM compatibility  
 // Note: Using the NUMERIC_VERSION from version.h for consistency
 // Format: MAJOR*100 + MINOR*10 + PATCH (to maintain compatibility with existing EEPROM data)
@@ -23,5 +26,8 @@ extern CONTROLLER m_defaultController;
 void initializeEEPROM();
 void getSettings();
 void putSettings();
+void saveWiFiConfig();
+void loadWiFiConfig();
+void factoryResetAll();
 
 #endif // EEPROM_MANAGER_H

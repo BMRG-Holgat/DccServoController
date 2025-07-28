@@ -25,7 +25,7 @@ const int output27 = 27;
 const uint8_t numChars = 32;
 
 // EEPROM configuration
-#define EEPROM_SIZE 512
+#define EEPROM_SIZE 1024  // Increased size for WiFi configuration storage
 
 // Timing constants
 #define SERVO_UPDATE_INTERVAL 15  // milliseconds

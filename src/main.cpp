@@ -3,6 +3,7 @@
 #include "dcc_handler.h"
 #include "eeprom_manager.h"
 #include "serial_commands.h"
+#include "wifi_controller.h"
 
 // Auxiliary variables to store the current output state
 String output26State = "off";
@@ -17,8 +18,12 @@ void setup() {
     
     // Restore servo array from EEPROM
     getSettings();
-    Serial.println("Boot complete\n");
     
+    // Load WiFi configuration from EEPROM
+    loadWiFiConfig();
+    
+    Serial.println("Boot complete\n");
+
     // Initialize GPIO pins
     pinMode(output26, OUTPUT);
     pinMode(output27, OUTPUT);
@@ -30,6 +35,9 @@ void setup() {
 
     // Initialize DCC system
     initializeDCC();
+    
+    // Initialize WiFi system
+    initializeWiFi();
 }
 
 void loop() {
@@ -56,4 +64,7 @@ void loop() {
     // Handle serial communication
     recvWithEndMarker();
     processSerialCommands();
+    
+    // Handle WiFi events
+    handleWiFiEvents();
 }

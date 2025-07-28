@@ -1,6 +1,7 @@
 #include "serial_commands.h"
 #include "servo_controller.h"
 #include "eeprom_manager.h"
+#include "wifi_controller.h"
 #include "config.h"
 #include "version.h"
 
@@ -117,6 +118,11 @@ void processSerialCommands() {
             Serial.println("x - Display all servo configurations");
             Serial.println("v - Show version and feature information");
             Serial.println("w - Show version history and changelog");
+            Serial.println("wifi - Show WiFi status and configuration");
+            Serial.println("scan - Scan for available WiFi networks");
+            Serial.println("ap ssid,password - Configure Access Point");
+            Serial.println("sta ssid,password - Configure Station mode");
+            Serial.println("factory - Factory reset (clears WiFi and servo settings)");
             Serial.println();
             Serial.println("Servo numbers: 0-15 (maps to GPIO pins automatically)");
             Serial.println("GPIO pins can also be used directly");
@@ -126,7 +132,21 @@ void processSerialCommands() {
             Serial.println("Virtual routes not yet implemented");
             break;
         default:
-            Serial.println("Unknown command. Type 'h' for help.");
+            // Check for multi-character commands
+            String command = String(receivedChars);
+            if (command.startsWith("wifi")) {
+                printWiFiStatus();
+            } else if (command.startsWith("scan")) {
+                processWiFiScanCommand();
+            } else if (command.startsWith("ap ")) {
+                processAPConfigCommand();
+            } else if (command.startsWith("sta ")) {
+                processStationConfigCommand();
+            } else if (command.startsWith("factory")) {
+                processFactoryResetCommand();
+            } else {
+                Serial.println("Unknown command. Type 'h' for help.");
+            }
             break;
     }
 }
@@ -406,4 +426,169 @@ void processDisplayCommand() {
             Serial.println("OK");
         }
     }
+}
+
+void processAPConfigCommand() {
+    // Command format: ap ssid,password
+    char *pch;
+    char *ssid = nullptr;
+    char *password = nullptr;
+    int i = 0;
+    
+    pch = strtok(receivedChars, " ,");
+    while (pch != NULL) {
+        switch (i) {
+            case 1:
+                ssid = pch;
+                break;
+            case 2:
+                password = pch;
+                break;
+        }
+        ++i;
+        pch = strtok(NULL, " ,");
+    }
+    
+    if (ssid != nullptr && password != nullptr) {
+        strncpy(wifiConfig.apSSID, ssid, WIFI_SSID_MAX_LENGTH - 1);
+        wifiConfig.apSSID[WIFI_SSID_MAX_LENGTH - 1] = '\0';
+        strncpy(wifiConfig.apPassword, password, WIFI_PASSWORD_MAX_LENGTH - 1);
+        wifiConfig.apPassword[WIFI_PASSWORD_MAX_LENGTH - 1] = '\0';
+        
+        wifiConfig.mode = DCC_WIFI_AP;
+        
+        bootController.isDirty = true;
+        putSettings();
+        saveWiFiConfig();
+        
+        Serial.printf("AP configuration updated: SSID=%s, Password=%s\n", ssid, password);
+        Serial.println("Restarting WiFi...");
+        
+        WiFi.disconnect();
+        delay(1000);
+        initializeWiFi();
+    } else {
+        Serial.println("Error: Usage: ap ssid,password");
+    }
+}
+
+void processStationConfigCommand() {
+    // Command format: sta ssid,password
+    char *pch;
+    char *ssid = nullptr;
+    char *password = nullptr;
+    int i = 0;
+    
+    pch = strtok(receivedChars, " ,");
+    while (pch != NULL) {
+        switch (i) {
+            case 1:
+                ssid = pch;
+                break;
+            case 2:
+                password = pch;
+                break;
+        }
+        ++i;
+        pch = strtok(NULL, " ,");
+    }
+    
+    if (ssid != nullptr && password != nullptr) {
+        strncpy(wifiConfig.stationSSID, ssid, WIFI_SSID_MAX_LENGTH - 1);
+        wifiConfig.stationSSID[WIFI_SSID_MAX_LENGTH - 1] = '\0';
+        strncpy(wifiConfig.stationPassword, password, WIFI_PASSWORD_MAX_LENGTH - 1);
+        wifiConfig.stationPassword[WIFI_PASSWORD_MAX_LENGTH - 1] = '\0';
+        
+        wifiConfig.mode = DCC_WIFI_STATION;
+        
+        bootController.isDirty = true;
+        putSettings();
+        saveWiFiConfig();
+        
+        Serial.printf("Station configuration updated: SSID=%s, Password=%s\n", ssid, password);
+        Serial.println("Restarting WiFi...");
+        
+        WiFi.disconnect();
+        delay(1000);
+        initializeWiFi();
+    } else {
+        Serial.println("Error: Usage: sta ssid,password");
+    }
+}
+
+void processFactoryResetCommand() {
+    Serial.println("Are you sure you want to perform a factory reset? (y/N)");
+    Serial.println("This will reset all WiFi settings and servo configurations.");
+    
+    // Wait for user confirmation
+    unsigned long startTime = millis();
+    while (millis() - startTime < 10000) {  // 10 second timeout
+        if (Serial.available()) {
+            char response = Serial.read();
+            if (response == 'y' || response == 'Y') {
+                factoryResetAll();
+                Serial.println("Factory reset complete. Restarting WiFi...");
+                WiFi.disconnect();
+                delay(1000);
+                initializeWiFi();
+                return;
+            } else {
+                Serial.println("Factory reset cancelled.");
+                return;
+            }
+        }
+        delay(100);
+    }
+    Serial.println("Factory reset cancelled (timeout).");
+}
+
+void processWiFiScanCommand() {
+    Serial.println("Scanning for WiFi networks...");
+    
+    int numNetworks = WiFi.scanNetworks();
+    
+    if (numNetworks > 0) {
+        Serial.printf("Found %d networks:\n", numNetworks);
+        Serial.println("SSID\t\t\tRSSI\tChannel\tEncryption");
+        Serial.println("----------------------------------------");
+        
+        for (int i = 0; i < numNetworks; i++) {
+            String ssid = WiFi.SSID(i);
+            int32_t rssi = WiFi.RSSI(i);
+            uint8_t channel = WiFi.channel(i);
+            wifi_auth_mode_t encryption = WiFi.encryptionType(i);
+            
+            // Pad SSID for alignment
+            String paddedSSID = ssid;
+            while (paddedSSID.length() < 24) {
+                paddedSSID += " ";
+            }
+            
+            String encType;
+            switch (encryption) {
+                case WIFI_AUTH_OPEN: encType = "Open"; break;
+                case WIFI_AUTH_WEP: encType = "WEP"; break;
+                case WIFI_AUTH_WPA_PSK: encType = "WPA"; break;
+                case WIFI_AUTH_WPA2_PSK: encType = "WPA2"; break;
+                case WIFI_AUTH_WPA_WPA2_PSK: encType = "WPA/WPA2"; break;
+                case WIFI_AUTH_WPA2_ENTERPRISE: encType = "WPA2-Enterprise"; break;
+                case WIFI_AUTH_WPA3_PSK: encType = "WPA3"; break;
+                default: encType = "Unknown"; break;
+            }
+            
+            Serial.printf("%s\t%d\t%d\t%s\n", 
+                         paddedSSID.c_str(), 
+                         rssi, 
+                         channel, 
+                         encType.c_str());
+        }
+        
+        Serial.println("----------------------------------------");
+        Serial.println("Use 'sta SSID,PASSWORD' to connect to a network");
+    } else {
+        Serial.println("No networks found");
+    }
+    
+    // Clean up scan results
+    WiFi.scanDelete();
 }
