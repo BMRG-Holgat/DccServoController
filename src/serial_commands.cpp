@@ -84,15 +84,29 @@ void processSerialCommands() {
             processDisplayCommand();
             break;
         case 'v':
-            Serial.println("=== Version Information ===");
+            Serial.println("=== ESP32 DCC Servo Controller ===");
             Serial.print("Software Version: ");
             Serial.println(SOFTWARE_VERSION);
             Serial.print("Build Date: ");
             Serial.println(BUILD_DATE);
+            Serial.print("Build Time: ");
+            Serial.println(BUILD_TIME);
             Serial.print("Project: ");
             Serial.println(PROJECT_NAME);
+            Serial.print("Author: ");
+            Serial.println(PROJECT_AUTHOR);
+            Serial.print("GitHub: ");
+            Serial.println(PROJECT_URL);
             Serial.print("Numeric Version: ");
             Serial.println(NUMERIC_VERSION);
+            Serial.println();
+            Serial.println(FEATURE_LIST);
+            Serial.println();
+            Serial.println(HARDWARE_SPECS);
+            break;
+        case 'w':
+            Serial.println("=== Version History & Changelog ===");
+            Serial.println(VERSION_HISTORY);
             break;
         case 'h':
         case '?':
@@ -101,7 +115,8 @@ void processSerialCommands() {
             Serial.println("p servo,command - Manual control (c=closed, t=thrown, T=toggle, n=neutral)");
             Serial.println("d address,command - DCC emulation");
             Serial.println("x - Display all servo configurations");
-            Serial.println("v - Show version information");
+            Serial.println("v - Show version and feature information");
+            Serial.println("w - Show version history and changelog");
             Serial.println();
             Serial.println("Servo numbers: 0-15 (maps to GPIO pins automatically)");
             Serial.println("GPIO pins can also be used directly");

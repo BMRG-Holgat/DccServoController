@@ -4,8 +4,9 @@
 #include "config.h"
 #include "version.h"
 
-// Create numeric version for EEPROM compatibility (MMmmpp format: Major*10000 + Minor*100 + Patch)
-#define NUMERIC_VERSION (VERSION_MAJOR * 10000 + VERSION_MINOR * 100 + VERSION_PATCH)
+// Create numeric version for EEPROM compatibility  
+// Note: Using the NUMERIC_VERSION from version.h for consistency
+// Format: MAJOR*100 + MINOR*10 + PATCH (to maintain compatibility with existing EEPROM data)
 
 // Controller structure for EEPROM storage
 struct CONTROLLER {
