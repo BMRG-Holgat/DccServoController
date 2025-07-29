@@ -2,13 +2,14 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "0.3.4"
+#define SOFTWARE_VERSION "v0.3.10"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 3
-#define VERSION_PATCH 4
+#define VERSION_PATCH 7
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define NUMERIC_VERSION 34
+#define VERSION_NUMERIC 37
+#define NUMERIC_VERSION 36
 
 // Build information
 #define BUILD_DATE "2025-01-29"
@@ -21,6 +22,47 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.3.10 (2025-01-29):\n" \
+"  + Combined heartbeat and DCC signal indication back to single GPIO 2\n" \
+"  + DCC signal flashes take priority over heartbeat (no conflict)\n" \
+"  + Heartbeat state preserved and restored after DCC flash\n" \
+"  + Simplified to single LED for all status indication\n" \
+"\n" \
+"v0.3.9 (2025-01-29):\n" \
+"  + Separated heartbeat (GPIO 2) and DCC signal (GPIO 33) to independent pins\n" \
+"  + Fixed conflict between heartbeat and DCC signal indication\n" \
+"  + Added debug output for both LED functions\n" \
+"  + Both LEDs now operate independently without interference\n" \
+"\n" \
+"v0.3.8 (2025-01-29):\n" \
+"  + Combined heartbeat and DCC signal indication on single GPIO pin 33\n" \
+"  + DCC signal flashes take priority over heartbeat blink pattern\n" \
+"  + Heartbeat resumes when DCC signal flash completes\n" \
+"  + Moved from GPIO 2 to GPIO 33 for better ESP32 compatibility\n" \
+"  + Simplified hardware requirements to single status LED\n" \
+"\n" \
+"v0.3.7 (2025-01-29):\n" \
+"  + Added DCC debug web interface (/dcc-debug) with real-time monitoring\n" \
+"  + Web interface shows live DCC packet log with auto-refresh\n" \
+"  + Activate/deactivate DCC debug mode from web browser\n" \
+"  + Visual indicators for address matches vs ignored packets\n" \
+"  + Added circular buffer log for last 50 DCC messages\n" \
+"  + Navigation link added to main page for easy access\n" \
+"\n" \
+"v0.3.6 (2025-01-29):\n" \
+"  + Added DCC receiving signal indicator on GPIO pin 2\n" \
+"  + DCC signal LED flashes only for configured servo addresses\n" \
+"  + Added 'z' command for DCC debug mode toggle\n" \
+"  + Enhanced DCC packet monitoring with detailed console output\n" \
+"  + Shows DCC address matches and servo actions in debug mode\n" \
+"  + Moved heartbeat LED to GPIO pin 33 to free up pin 2\n" \
+"  + Filters DCC packets to only process configured addresses\n" \
+"\n" \
+"v0.3.5 (2025-01-29):\n" \
+"  + Added heartbeat LED functionality on GPIO pin 2\n" \
+"  + Visual indicator showing device is running (1 second blink rate)\n" \
+"  + Independent heartbeat timing from servo update cycles\n" \
+"\n" \
 "v0.3.4 (2025-01-28):\n" \
 "  + Fixed compilation errors with missing ESPmDNS header\n" \
 "  + Completed mDNS functionality with proper includes\n" \
@@ -112,6 +154,9 @@
 "• mDNS network discovery (accessible via dccservo.local)\n" \
 "• Automatic mDNS service advertisement with device information\n" \
 "• Enhanced serial console with 'w' command for detailed WiFi status\n" \
+"• DCC debug mode with 'z' command for packet monitoring\n" \
+"• DCC receiving signal indicator on GPIO pin 2 (for valid addresses)\n" \
+"• Heartbeat LED indicator on GPIO pin 33 (1 second blink rate)\n" \
 "• Factory reset function for complete settings reset\n" \
 "• Individual servo configuration save capability\n" \
 "• Comprehensive servo control table with invert status display\n" \
@@ -131,6 +176,7 @@
 "Hardware Requirements:\n" \
 "• ESP32 development board\n" \
 "• DCC signal input on GPIO 4\n" \
+"• Combined heartbeat/DCC indication LED on GPIO 2\n" \
 "• Up to 16 servo motors\n" \
 "• 5V power supply for servos\n" \
 "• Servo pins: 5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32"

@@ -2,6 +2,11 @@
 #include "servo_controller.h"
 #include "config.h"
 
+// External functions from main.cpp
+extern void triggerDccSignal();
+extern bool dccDebugEnabled;
+extern void addDccLogMessage(const String& message);
+
 // Global DCC objects
 NmraDcc Dcc;
 DCC_MSG Packet;
@@ -47,12 +52,30 @@ void notifyDccAccTurnoutBoard(uint16_t BoardAddr, uint8_t OutputPair, uint8_t Di
 }
 
 void notifyDccAccTurnoutOutput(uint16_t Addr, uint8_t Direction, uint8_t OutputPower) {
-    Serial.print("notifyDccAccTurnoutOutput: ");
-    Serial.print(Addr, DEC);
-    Serial.print(',');
-    Serial.print(Direction, DEC);
-    Serial.print(',');
-    Serial.println(OutputPower, HEX);
+    // Check if this address matches any of our configured servos
+    bool isOurAddress = false;
+    for (auto &sv : virtualservo) {
+        if (Addr == sv.address && sv.address != 0) {
+            isOurAddress = true;
+            break;
+        }
+    }
+    
+    // Only trigger signal indication for our configured addresses
+    if (isOurAddress) {
+        triggerDccSignal();
+    }
+    
+    // Debug output if enabled
+    if (dccDebugEnabled) {
+        String debugMsg = "Addr=" + String(Addr) + ", Dir=" + String(Direction) + 
+                         ", Pwr=" + String(OutputPower, HEX) + (isOurAddress ? " [MATCH]" : " [ignore]");
+        Serial.print("DCC RX: ");
+        Serial.println(debugMsg);
+        addDccLogMessage(debugMsg);
+    }
+
+    if (!isOurAddress) return;  // Only process packets for our addresses
 
     VIRTUALSERVO *targetVirtualServo = nullptr;
 
@@ -70,8 +93,12 @@ void notifyDccAccTurnoutOutput(uint16_t Addr, uint8_t Direction, uint8_t OutputP
                 targetVirtualServo->state = SERVO_TO_THROWN;
             }
             
-            Serial.print("command sent to pin: ");
-            Serial.println(targetVirtualServo->pin, DEC);
+            if (dccDebugEnabled) {
+                String servoMsg = "Servo action: Pin " + String(targetVirtualServo->pin) + 
+                                " -> " + String(Direction == 0 ? "CLOSED" : "THROWN");
+                Serial.println(servoMsg);
+                addDccLogMessage(servoMsg);
+            }
         }
     }
 }

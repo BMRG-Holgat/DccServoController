@@ -42,7 +42,7 @@ void initializeSerial() {
     Serial.print(PROJECT_NAME);
     Serial.print(" v");
     Serial.println(SOFTWARE_VERSION);
-    Serial.println("Commands: s p x d v w");
+    Serial.println("Commands: s p x d v w z");
     Serial.println("Type 'h' for help");
 }
 
@@ -110,6 +110,9 @@ void processSerialCommands() {
         case 'w':
             processWiFiStatusCommand();
             break;
+        case 'z':
+            processDccDebugCommand();
+            break;
         case 'h':
         case '?':
             Serial.println("Commands:");
@@ -119,6 +122,7 @@ void processSerialCommands() {
             Serial.println("x - Display all servo configurations");
             Serial.println("v - Show version and feature information");
             Serial.println("w - Show WiFi status (IP, SSID, channel, mDNS)");
+            Serial.println("z - Toggle DCC debug mode (monitor DCC packets)");
             Serial.println("wifi - Show detailed WiFi configuration");
             Serial.println("scan - Scan for available WiFi networks");
             Serial.println("ap ssid,password - Configure Access Point");
@@ -788,5 +792,46 @@ void processMDNSTestCommand() {
         Serial.printf("Direct AP IP: http://%s\n", WiFi.softAPIP().toString().c_str());
     }
     
+    Serial.println("==================");
+}
+
+void processDccDebugCommand() {
+    extern void toggleDccDebug();
+    extern bool dccDebugEnabled;
+    
+    toggleDccDebug();
+    
+    Serial.println("=== DCC Debug Mode ===");
+    Serial.printf("Status: %s\n", dccDebugEnabled ? "ENABLED" : "DISABLED");
+    
+    if (dccDebugEnabled) {
+        Serial.println("DCC packet monitoring is now active.");
+        Serial.println("You will see debug output for:");
+        Serial.println("• All received DCC accessory packets");
+        Serial.println("• Packets matching configured servo addresses");
+        Serial.println("• Servo actions triggered by DCC commands");
+        Serial.println("• DCC signal LED will flash on GPIO 2 for valid packets");
+    } else {
+        Serial.println("DCC packet monitoring is now disabled.");
+        Serial.println("Only matched servo actions will be processed.");
+    }
+    
+    // Show configured DCC addresses
+    Serial.println("\nConfigured DCC addresses:");
+    bool hasAddresses = false;
+    for (int i = 0; i < TOTAL_PINS; i++) {
+        if (virtualservo[i].address != 0) {
+            Serial.printf("  Servo %d (GPIO %d): Address %d\n", 
+                         i, virtualservo[i].pin, virtualservo[i].address);
+            hasAddresses = true;
+        }
+    }
+    
+    if (!hasAddresses) {
+        Serial.println("  No DCC addresses configured!");
+        Serial.println("  Use 's' command to configure servo addresses.");
+    }
+    
+    Serial.println("\nType 'z' again to toggle debug mode.");
     Serial.println("==================");
 }

@@ -65,5 +65,8 @@ void updateWiFiConfig();
 void printWiFiStatus();
 bool isWiFiConnected();
 void processWiFiCommands();
+void handleDccDebug();
+void handleDccDebugToggle();
+void handleDccDebugLog();
 
 #endif // WIFI_CONTROLLER_H

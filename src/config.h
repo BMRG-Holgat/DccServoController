@@ -7,6 +7,8 @@
 #define TOTAL_PINS 16
 #define BASE_PIN 5  // First servo pin (for backward compatibility)
 #define DCC_PIN 4   // GPIO 4 for DCC signal input
+#define DCC_SIGNAL_PIN 2   // GPIO 2 for DCC receiving signal indicator (shared with heartbeat)
+#define HEARTBEAT_PIN 2   // GPIO 2 for heartbeat LED indicator
 
 // Note: Servo pins are not consecutive due to ESP32 hardware limitations
 // Valid servo pins: 5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32
@@ -30,6 +32,9 @@ const uint8_t numChars = 32;
 // Timing constants
 #define SERVO_UPDATE_INTERVAL 15  // milliseconds
 #define LED_BLINK_CYCLES 33       // 15ms * 33 = ~495ms
+#define HEARTBEAT_INTERVAL 1000   // milliseconds - heartbeat blink rate
+#define DCC_SIGNAL_DURATION 100   // milliseconds - DCC signal LED on duration
+#define DCC_LOG_SIZE 50           // DCC debug log buffer size
 
 // Servo constants
 #define SERVO_CENTER_POSITION 90  // Default center position (degrees)

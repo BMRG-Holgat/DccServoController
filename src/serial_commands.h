@@ -25,5 +25,6 @@ void processFactoryResetCommand();
 void processWiFiScanCommand();
 void processWiFiStatusCommand();
 void processMDNSTestCommand();
+void processDccDebugCommand();
 
 #endif // SERIAL_COMMANDS_H

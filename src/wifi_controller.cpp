@@ -3,10 +3,19 @@
 #include "eeprom_manager.h"
 #include "serial_commands.h"
 #include "version.h"
+#include "config.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
+
+// External references to main module functions and variables
+extern bool dccDebugEnabled;
+extern void toggleDccDebug();
+extern String dccLogBuffer[];
+extern int dccLogIndex;
+extern int dccLogCount;
+extern unsigned long dccLogTimestamp[];
 
 // Global WiFi objects
 WiFiConfig wifiConfig;
@@ -232,6 +241,9 @@ void startWebServer() {
     webServer.on("/servo", HTTP_POST, handleServoControl);
     webServer.on("/servo-config", HTTP_GET, handleServoConfig);
     webServer.on("/servo-config", HTTP_POST, updateServoConfig);
+    webServer.on("/dcc-debug", HTTP_GET, handleDccDebug);
+    webServer.on("/dcc-debug/toggle", HTTP_POST, handleDccDebugToggle);
+    webServer.on("/dcc-debug/log", HTTP_GET, handleDccDebugLog);
     webServer.on("/factory-reset", HTTP_POST, handleFactoryReset);
     webServer.onNotFound(handleNotFound);
     
@@ -330,6 +342,7 @@ void handleRoot() {
     html += "<a href='/config' class='button'>WiFi Configuration</a>";
     html += "<a href='/servo' class='button'>Servo Control</a>";
     html += "<a href='/servo-config' class='button'>Servo Configuration</a>";
+    html += "<a href='/dcc-debug' class='button'>DCC Debug Monitor</a>";
     html += "</div>";
     
     html += "</div></body></html>";
@@ -1280,4 +1293,175 @@ void printWiFiStatus() {
 
 bool isWiFiConnected() {
     return (WiFi.status() == WL_CONNECTED) || (WiFi.softAPgetStationNum() > 0);
+}
+
+// DCC Debug page handler
+void handleDccDebug() {
+    String html = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n";
+    html += "<meta charset=\"UTF-8\">\n";
+    html += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
+    html += "<title>DCC Debug Monitor</title>\n";
+    html += "<style>\n";
+    html += "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }\n";
+    html += ".container { max-width: 1000px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }\n";
+    html += ".header { text-align: center; margin-bottom: 30px; }\n";
+    html += ".status-panel { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }\n";
+    html += ".controls { text-align: center; margin-bottom: 20px; }\n";
+    html += ".btn { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }\n";
+    html += ".btn:hover { background-color: #0056b3; }\n";
+    html += ".btn.success { background-color: #28a745; }\n";
+    html += ".btn.success:hover { background-color: #1e7e34; }\n";
+    html += ".btn.danger { background-color: #dc3545; }\n";
+    html += ".btn.danger:hover { background-color: #c82333; }\n";
+    html += ".log-container { border: 1px solid #ddd; border-radius: 5px; background-color: #f8f9fa; }\n";
+    html += ".log-header { background-color: #343a40; color: white; padding: 10px; border-radius: 5px 5px 0 0; }\n";
+    html += ".log-content { max-height: 400px; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 12px; }\n";
+    html += ".log-entry { margin-bottom: 5px; padding: 2px; }\n";
+    html += ".log-timestamp { color: #666; margin-right: 10px; }\n";
+    html += ".log-match { background-color: #d4edda; }\n";
+    html += ".log-ignore { background-color: #f8d7da; }\n";
+    html += ".nav-links { text-align: center; margin-top: 20px; }\n";
+    html += ".nav-links a { margin: 0 10px; color: #007bff; text-decoration: none; }\n";
+    html += ".nav-links a:hover { text-decoration: underline; }\n";
+    html += "</style>\n";
+    html += "<script>\n";
+    html += "let autoRefresh = true;\n";
+    html += "let refreshInterval;\n";
+    html += "function toggleDebug() {\n";
+    html += "  fetch('/dcc-debug/toggle', { method: 'POST' })\n";
+    html += "    .then(response => response.text())\n";
+    html += "    .then(data => {\n";
+    html += "      setTimeout(() => location.reload(), 500);\n";
+    html += "    });\n";
+    html += "}\n";
+    html += "function updateLog() {\n";
+    html += "  if (!autoRefresh) return;\n";
+    html += "  fetch('/dcc-debug/log')\n";
+    html += "    .then(response => response.text())\n";
+    html += "    .then(data => {\n";
+    html += "      document.getElementById('log-content').innerHTML = data;\n";
+    html += "      const logContainer = document.getElementById('log-content');\n";
+    html += "      logContainer.scrollTop = logContainer.scrollHeight;\n";
+    html += "    });\n";
+    html += "}\n";
+    html += "function toggleAutoRefresh() {\n";
+    html += "  autoRefresh = !autoRefresh;\n";
+    html += "  const btn = document.getElementById('refresh-btn');\n";
+    html += "  if (autoRefresh) {\n";
+    html += "    btn.textContent = 'Pause Auto-Refresh';\n";
+    html += "    btn.className = 'btn danger';\n";
+    html += "    refreshInterval = setInterval(updateLog, 1000);\n";
+    html += "  } else {\n";
+    html += "    btn.textContent = 'Resume Auto-Refresh';\n";
+    html += "    btn.className = 'btn success';\n";
+    html += "    clearInterval(refreshInterval);\n";
+    html += "  }\n";
+    html += "}\n";
+    html += "function clearLog() {\n";
+    html += "  document.getElementById('log-content').innerHTML = '<div class=\"log-entry\">Log cleared...</div>';\n";
+    html += "}\n";
+    html += "window.onload = function() {\n";
+    html += "  updateLog();\n";
+    html += "  refreshInterval = setInterval(updateLog, 1000);\n";
+    html += "};\n";
+    html += "</script>\n";
+    html += "</head>\n<body>\n";
+    html += "<div class=\"container\">\n";
+    html += "<div class=\"header\">\n";
+    html += "<h1>DCC Debug Monitor</h1>\n";
+    html += "<p>Real-time monitoring of DCC packet reception</p>\n";
+    html += "</div>\n";
+    
+    // Status panel
+    html += "<div class=\"status-panel\">\n";
+    html += "<h3>Current Status</h3>\n";
+    html += "<p><strong>DCC Debug Mode:</strong> " + String(dccDebugEnabled ? "ENABLED" : "DISABLED") + "</p>\n";
+    html += "<p><strong>Configured Servo Addresses:</strong> ";
+    
+    // Add servo addresses
+    bool first = true;
+    for (const auto &sv : virtualservo) {
+        if (sv.address > 0) {
+            if (!first) html += ", ";
+            html += String(sv.address);
+            first = false;
+        }
+    }
+    if (first) html += "None configured";
+    html += "</p>\n";
+    html += "</div>\n";
+    
+    // Controls
+    html += "<div class=\"controls\">\n";
+    html += "<button class=\"btn " + String(dccDebugEnabled ? "danger" : "success") + "\" onclick=\"toggleDebug()\">";
+    html += dccDebugEnabled ? "Disable Debug" : "Enable Debug";
+    html += "</button>\n";
+    html += "<button id=\"refresh-btn\" class=\"btn danger\" onclick=\"toggleAutoRefresh()\">Pause Auto-Refresh</button>\n";
+    html += "<button class=\"btn\" onclick=\"clearLog()\">Clear Display</button>\n";
+    html += "<button class=\"btn\" onclick=\"location.reload()\">Refresh Page</button>\n";
+    html += "</div>\n";
+    
+    // Log container
+    html += "<div class=\"log-container\">\n";
+    html += "<div class=\"log-header\">DCC Packet Log (Last " + String(DCC_LOG_SIZE) + " messages)</div>\n";
+    html += "<div id=\"log-content\" class=\"log-content\"></div>\n";
+    html += "</div>\n";
+    
+    // Navigation
+    html += "<div class=\"nav-links\">\n";
+    html += "<a href=\"/\">Home</a>\n";
+    html += "<a href=\"/servo\">Servo Control</a>\n";
+    html += "<a href=\"/servo-config\">Servo Config</a>\n";
+    html += "<a href=\"/config\">WiFi Config</a>\n";
+    html += "</div>\n";
+    
+    html += "</div>\n</body>\n</html>";
+    
+    webServer.send(200, "text/html", html);
+}
+
+// DCC Debug toggle handler
+void handleDccDebugToggle() {
+    toggleDccDebug();
+    webServer.send(200, "text/plain", dccDebugEnabled ? "DEBUG_ENABLED" : "DEBUG_DISABLED");
+}
+
+// DCC Debug log data handler
+void handleDccDebugLog() {
+    String logHtml = "";
+    
+    if (dccLogCount == 0) {
+        logHtml = "<div class=\"log-entry\">No DCC packets logged yet...</div>";
+    } else {
+        // Display log entries in chronological order (oldest first)
+        int startIndex = (dccLogCount < DCC_LOG_SIZE) ? 0 : dccLogIndex;
+        
+        for (int i = 0; i < dccLogCount; i++) {
+            int index = (startIndex + i) % DCC_LOG_SIZE;
+            
+            // Format timestamp
+            unsigned long timestamp = dccLogTimestamp[index];
+            unsigned long seconds = timestamp / 1000;
+            unsigned long milliseconds = timestamp % 1000;
+            
+            String timestampStr = String(seconds) + "." + String(milliseconds);
+            if (milliseconds < 100) timestampStr = String(seconds) + ".0" + String(milliseconds);
+            if (milliseconds < 10) timestampStr = String(seconds) + ".00" + String(milliseconds);
+            
+            // Determine entry class based on content
+            String entryClass = "log-entry";
+            if (dccLogBuffer[index].indexOf("[MATCH]") != -1) {
+                entryClass += " log-match";
+            } else if (dccLogBuffer[index].indexOf("[ignore]") != -1) {
+                entryClass += " log-ignore";
+            }
+            
+            logHtml += "<div class=\"" + entryClass + "\">";
+            logHtml += "<span class=\"log-timestamp\">" + timestampStr + "s</span>";
+            logHtml += dccLogBuffer[index];
+            logHtml += "</div>";
+        }
+    }
+    
+    webServer.send(200, "text/html", logHtml);
 }
