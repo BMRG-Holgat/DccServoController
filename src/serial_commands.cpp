@@ -4,6 +4,8 @@
 #include "wifi_controller.h"
 #include "config.h"
 #include "version.h"
+#include <esp_wifi.h>
+#include <ESPmDNS.h>
 
 // Helper function to check if pin is valid and convert servo number to GPIO if needed
 uint8_t validateAndConvertPin(uint8_t inputPin) {
@@ -40,7 +42,7 @@ void initializeSerial() {
     Serial.print(PROJECT_NAME);
     Serial.print(" v");
     Serial.println(SOFTWARE_VERSION);
-    Serial.println("Commands: s p x d v");
+    Serial.println("Commands: s p x d v w");
     Serial.println("Type 'h' for help");
 }
 
@@ -106,8 +108,7 @@ void processSerialCommands() {
             Serial.println(HARDWARE_SPECS);
             break;
         case 'w':
-            Serial.println("=== Version History & Changelog ===");
-            Serial.println(VERSION_HISTORY);
+            processWiFiStatusCommand();
             break;
         case 'h':
         case '?':
@@ -117,12 +118,14 @@ void processSerialCommands() {
             Serial.println("d address,command - DCC emulation");
             Serial.println("x - Display all servo configurations");
             Serial.println("v - Show version and feature information");
-            Serial.println("w - Show version history and changelog");
-            Serial.println("wifi - Show WiFi status and configuration");
+            Serial.println("w - Show WiFi status (IP, SSID, channel, mDNS)");
+            Serial.println("wifi - Show detailed WiFi configuration");
             Serial.println("scan - Scan for available WiFi networks");
             Serial.println("ap ssid,password - Configure Access Point");
             Serial.println("sta ssid,password - Configure Station mode");
             Serial.println("factory - Factory reset (clears WiFi and servo settings)");
+            Serial.println("history - Show version history and changelog");
+            Serial.println("mdns - Test mDNS functionality and restart if needed");
             Serial.println();
             Serial.println("Servo numbers: 0-15 (maps to GPIO pins automatically)");
             Serial.println("GPIO pins can also be used directly");
@@ -144,6 +147,11 @@ void processSerialCommands() {
                 processStationConfigCommand();
             } else if (command.startsWith("factory")) {
                 processFactoryResetCommand();
+            } else if (command.startsWith("history")) {
+                Serial.println("=== Version History & Changelog ===");
+                Serial.println(VERSION_HISTORY);
+            } else if (command.startsWith("mdns")) {
+                processMDNSTestCommand();
             } else {
                 Serial.println("Unknown command. Type 'h' for help.");
             }
@@ -591,4 +599,194 @@ void processWiFiScanCommand() {
     
     // Clean up scan results
     WiFi.scanDelete();
+}
+
+void processWiFiStatusCommand() {
+    Serial.println("=== WiFi Status ===");
+    
+    // Show current mode
+    Serial.printf("Mode: ");
+    switch (wifiConfig.mode) {
+        case DCC_WIFI_OFF:
+            Serial.println("Disabled");
+            break;
+        case DCC_WIFI_AP:
+            Serial.println("Access Point Only");
+            break;
+        case DCC_WIFI_STATION:
+            Serial.println("Station Only");
+            break;
+        case DCC_WIFI_AP_STATION:
+            Serial.println("AP + Station");
+            break;
+        default:
+            Serial.println("Unknown");
+            break;
+    }
+    
+    Serial.printf("Enabled: %s\n", wifiConfig.enabled ? "Yes" : "No");
+    
+    // Access Point information
+    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+        Serial.println("\n--- Access Point ---");
+        Serial.printf("AP SSID: %s\n", wifiConfig.apSSID);
+        Serial.printf("AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+        Serial.printf("AP Clients: %d\n", WiFi.softAPgetStationNum());
+        
+        // Get AP channel (ESP32 specific)
+        wifi_config_t conf;
+        esp_wifi_get_config(WIFI_IF_AP, &conf);
+        Serial.printf("AP Channel: %d\n", conf.ap.channel);
+    }
+    
+    // Station information
+    if (wifiConfig.mode == DCC_WIFI_STATION || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+        Serial.println("\n--- Station ---");
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.printf("Connected to: %s\n", WiFi.SSID().c_str());
+            Serial.printf("Station IP: %s\n", WiFi.localIP().toString().c_str());
+            Serial.printf("Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
+            Serial.printf("Subnet Mask: %s\n", WiFi.subnetMask().toString().c_str());
+            Serial.printf("DNS 1: %s\n", WiFi.dnsIP(0).toString().c_str());
+            Serial.printf("DNS 2: %s\n", WiFi.dnsIP(1).toString().c_str());
+            Serial.printf("Signal Strength: %d dBm\n", WiFi.RSSI());
+            Serial.printf("Channel: %d\n", WiFi.channel());
+            
+            // Get detailed connection info
+            wifi_ap_record_t ap_info;
+            if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+                Serial.printf("BSSID: %02x:%02x:%02x:%02x:%02x:%02x\n",
+                             ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2],
+                             ap_info.bssid[3], ap_info.bssid[4], ap_info.bssid[5]);
+                
+                String authMode;
+                switch (ap_info.authmode) {
+                    case WIFI_AUTH_OPEN: authMode = "Open"; break;
+                    case WIFI_AUTH_WEP: authMode = "WEP"; break;
+                    case WIFI_AUTH_WPA_PSK: authMode = "WPA"; break;
+                    case WIFI_AUTH_WPA2_PSK: authMode = "WPA2"; break;
+                    case WIFI_AUTH_WPA_WPA2_PSK: authMode = "WPA/WPA2"; break;
+                    case WIFI_AUTH_WPA2_ENTERPRISE: authMode = "WPA2 Enterprise"; break;
+                    case WIFI_AUTH_WPA3_PSK: authMode = "WPA3"; break;
+                    case WIFI_AUTH_WPA2_WPA3_PSK: authMode = "WPA2/WPA3"; break;
+                    default: authMode = "Unknown"; break;
+                }
+                Serial.printf("Security: %s\n", authMode.c_str());
+            }
+        } else {
+            Serial.println("Status: Not connected");
+            if (strlen(wifiConfig.stationSSID) > 0) {
+                Serial.printf("Configured SSID: %s\n", wifiConfig.stationSSID);
+            } else {
+                Serial.println("No station SSID configured");
+            }
+        }
+    }
+    
+    // Device information
+    Serial.println("\n--- Device Info ---");
+    Serial.printf("MAC Address: %s\n", getMacAddress().c_str());
+    
+    // mDNS information with troubleshooting
+    String mdnsHostname = getMDNSHostname();
+    Serial.printf("mDNS Hostname: %s.local\n", mdnsHostname.c_str());
+    
+    // Test mDNS resolution
+    IPAddress resolvedIP = MDNS.queryHost(mdnsHostname);
+    if (resolvedIP != IPAddress(0, 0, 0, 0)) {
+        Serial.printf("mDNS Status: ✓ Active (resolves to %s)\n", resolvedIP.toString().c_str());
+    } else {
+        Serial.println("mDNS Status: ⚠ Not resolving");
+    }
+    
+    // Show alternative access methods
+    Serial.println("\n--- Access Methods ---");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("Direct IP: http://%s\n", WiFi.localIP().toString().c_str());
+    }
+    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+        Serial.printf("AP Direct: http://%s\n", WiFi.softAPIP().toString().c_str());
+    }
+    Serial.printf("mDNS Link: http://%s.local\n", mdnsHostname.c_str());
+    
+    Serial.printf("\nFree Heap: %d bytes\n", ESP.getFreeHeap());
+    Serial.printf("WiFi Mode: %d\n", WiFi.getMode());
+    
+    // mDNS troubleshooting tips
+    if (resolvedIP == IPAddress(0, 0, 0, 0)) {
+        Serial.println("\n--- mDNS Troubleshooting ---");
+        Serial.println("If .local address doesn't work:");
+        Serial.println("• Use direct IP address instead");
+        Serial.println("• Check if your router supports mDNS/Bonjour");
+        Serial.println("• Try from a different device/browser");
+        Serial.println("• Windows: Install Bonjour Print Services");
+        Serial.println("• Router: Enable mDNS/Multicast forwarding");
+    }
+    
+    Serial.println("==================");
+}
+
+void processMDNSTestCommand() {
+    Serial.println("=== mDNS Test & Restart ===");
+    
+    String hostname = getMDNSHostname();
+    Serial.printf("Testing mDNS hostname: %s.local\n", hostname.c_str());
+    
+    // Test current mDNS status
+    IPAddress resolvedIP = MDNS.queryHost(hostname);
+    if (resolvedIP != IPAddress(0, 0, 0, 0)) {
+        Serial.printf("✓ Current mDNS is working: resolves to %s\n", resolvedIP.toString().c_str());
+    } else {
+        Serial.println("✗ Current mDNS is not resolving");
+    }
+    
+    // Show network status
+    Serial.println("\n--- Network Status ---");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("WiFi Status: Connected to %s\n", WiFi.SSID().c_str());
+        Serial.printf("Station IP: %s\n", WiFi.localIP().toString().c_str());
+    } else {
+        Serial.println("WiFi Status: Not connected to station");
+    }
+    
+    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+        Serial.printf("AP Status: Active (%s)\n", WiFi.softAPIP().toString().c_str());
+        Serial.printf("AP Clients: %d\n", WiFi.softAPgetStationNum());
+    }
+    
+    // Restart mDNS
+    Serial.println("\n--- Restarting mDNS ---");
+    MDNS.end();
+    delay(500);
+    
+    setupMDNS();
+    
+    // Wait and test again
+    delay(2000);
+    resolvedIP = MDNS.queryHost(hostname);
+    
+    Serial.println("\n--- Test Results ---");
+    if (resolvedIP != IPAddress(0, 0, 0, 0)) {
+        Serial.printf("✓ mDNS restart successful: %s.local -> %s\n", 
+                     hostname.c_str(), resolvedIP.toString().c_str());
+        Serial.println("✓ Device should be accessible via mDNS");
+    } else {
+        Serial.printf("⚠ mDNS still not resolving after restart\n");
+        Serial.println("\nTroubleshooting suggestions:");
+        Serial.println("• Use direct IP addresses instead of .local");
+        Serial.println("• Check router mDNS/Bonjour support");
+        Serial.println("• Try 'ping dccservo-XXXXXX.local' from computer");
+        Serial.println("• Windows users: install Bonjour Print Services");
+        Serial.println("• Some corporate networks block mDNS traffic");
+    }
+    
+    Serial.println("\n--- Alternative Access ---");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("Direct Station IP: http://%s\n", WiFi.localIP().toString().c_str());
+    }
+    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+        Serial.printf("Direct AP IP: http://%s\n", WiFi.softAPIP().toString().c_str());
+    }
+    
+    Serial.println("==================");
 }

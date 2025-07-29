@@ -23,5 +23,7 @@ void processAPConfigCommand();
 void processStationConfigCommand();
 void processFactoryResetCommand();
 void processWiFiScanCommand();
+void processWiFiStatusCommand();
+void processMDNSTestCommand();
 
 #endif // SERIAL_COMMANDS_H

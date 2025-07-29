@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
+#include <ESPmDNS.h>
 
 // Global WiFi objects
 WiFiConfig wifiConfig;
@@ -30,6 +31,11 @@ String getLastSixMacChars() {
     String mac = WiFi.macAddress();
     mac.replace(":", "");
     return mac.substring(mac.length() - 6);
+}
+
+String getMDNSHostname() {
+    // Use simple static hostname instead of MAC-based
+    return "dccservo";
 }
 
 void initializeWiFi() {
@@ -64,6 +70,9 @@ void initializeWiFi() {
     // Start web server if WiFi is enabled
     if (wifiConfig.enabled && wifiConfig.mode != DCC_WIFI_OFF) {
         startWebServer();
+        
+        // Setup mDNS after WiFi is connected
+        setupMDNS();
     }
     
     printWiFiStatus();
@@ -86,6 +95,76 @@ void generateDefaultCredentials() {
     Serial.println("Generated default WiFi credentials:");
     Serial.printf("AP SSID: %s\n", wifiConfig.apSSID);
     Serial.printf("AP Password: %s\n", wifiConfig.apPassword);
+}
+
+void setupMDNS() {
+    String hostname = getMDNSHostname();
+    
+    Serial.printf("Starting mDNS with hostname: %s.local\n", hostname.c_str());
+    Serial.printf("Hostname length: %d characters\n", hostname.length());
+    
+    // Validate hostname format (RFC requirements)
+    bool validHostname = true;
+    if (hostname.length() > 63) {
+        Serial.println("ERROR: Hostname too long (max 63 characters)");
+        validHostname = false;
+    }
+    
+    for (int i = 0; i < hostname.length(); i++) {
+        char c = hostname[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) {
+            Serial.printf("ERROR: Invalid character '%c' in hostname at position %d\n", c, i);
+            validHostname = false;
+        }
+    }
+    
+    if (!validHostname) {
+        Serial.println("Using fallback hostname: dccservo");
+        hostname = "dccservo";
+    }
+    
+    // End any existing mDNS service
+    MDNS.end();
+    delay(100);
+    
+    if (MDNS.begin(hostname.c_str())) {
+        Serial.printf("✓ mDNS responder started successfully\n");
+        Serial.printf("✓ Device accessible at: http://%s.local\n", hostname.c_str());
+        
+        // Add service advertisements with error checking
+        if (MDNS.addService("http", "tcp", 80)) {
+            Serial.println("✓ HTTP service advertised on port 80");
+        } else {
+            Serial.println("✗ Failed to advertise HTTP service");
+        }
+        
+        // Add service text records
+        MDNS.addServiceTxt("http", "tcp", "version", SOFTWARE_VERSION);
+        MDNS.addServiceTxt("http", "tcp", "device", "ESP32 DCC Servo Controller");
+        MDNS.addServiceTxt("http", "tcp", "mac", getMacAddress());
+        MDNS.addServiceTxt("http", "tcp", "ip", WiFi.localIP().toString());
+        
+        Serial.println("✓ mDNS service metadata published");
+        
+        // Test mDNS resolution
+        Serial.println("Testing mDNS resolution...");
+        IPAddress resolvedIP = MDNS.queryHost(hostname);
+        if (resolvedIP != IPAddress(0, 0, 0, 0)) {
+            Serial.printf("✓ mDNS self-test passed: %s resolves to %s\n", 
+                         hostname.c_str(), resolvedIP.toString().c_str());
+        } else {
+            Serial.printf("⚠ mDNS self-test failed: %s did not resolve\n", hostname.c_str());
+            Serial.println("  This may be normal during initial startup");
+        }
+        
+    } else {
+        Serial.println("✗ Failed to start mDNS responder");
+        Serial.println("  Device will only be accessible via IP address");
+        Serial.println("  Common causes:");
+        Serial.println("  - WiFi not connected");
+        Serial.println("  - Hostname conflicts");
+        Serial.println("  - Network doesn't support mDNS");
+    }
 }
 
 void setupAccessPoint() {
@@ -180,6 +259,8 @@ void handleRoot() {
     html += ".info-item{margin:8px 0;padding:5px 0;}";
     html += ".info-label{font-weight:bold;color:#333;}";
     html += ".info-value{color:#666;margin-left:10px;}";
+    html += ".info-value a{color:#4CAF50;text-decoration:none;}";
+    html += ".info-value a:hover{text-decoration:underline;}";
     html += "@media (max-width:600px){";
     html += ".container{margin:10px;padding:15px;}";
     html += ".button{width:100%;margin:5px 0;padding:15px;font-size:18px;}";
@@ -227,6 +308,17 @@ void handleRoot() {
     html += "<div class='info-card'>";
     html += "<h3>Device Information</h3>";
     html += "<div class='info-item'><span class='info-label'>MAC Address:</span><span class='info-value'>" + getMacAddress() + "</span></div>";
+    
+    // Access methods section
+    html += "<div class='info-item'><span class='info-label'>Access Methods:</span></div>";
+    if (WiFi.status() == WL_CONNECTED) {
+        html += "<div class='info-item' style='margin-left:20px;'><span class='info-label'>Direct IP:</span><span class='info-value'><a href='http://" + WiFi.localIP().toString() + "' target='_blank'>" + WiFi.localIP().toString() + "</a></span></div>";
+    }
+    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+        html += "<div class='info-item' style='margin-left:20px;'><span class='info-label'>AP Direct:</span><span class='info-value'><a href='http://" + WiFi.softAPIP().toString() + "' target='_blank'>" + WiFi.softAPIP().toString() + "</a></span></div>";
+    }
+    html += "<div class='info-item' style='margin-left:20px;'><span class='info-label'>mDNS Link:</span><span class='info-value'><a href='http://" + getMDNSHostname() + ".local' target='_blank'>" + getMDNSHostname() + ".local</a> <small style='color:#888;'>(if supported)</small></span></div>";
+    
     html += "<div class='info-item'><span class='info-label'>Free Heap:</span><span class='info-value'>" + String(ESP.getFreeHeap()) + " bytes</span></div>";
     html += "<div class='info-item'><span class='info-label'>Uptime:</span><span class='info-value'>" + String(millis() / 1000) + " seconds</span></div>";
     html += "</div>";
@@ -1119,14 +1211,25 @@ void handleWiFiEvents() {
     
     // Monitor WiFi connection status
     static unsigned long lastStatusCheck = 0;
+    static bool wasConnected = false;
+    
     if (millis() - lastStatusCheck > 30000) {  // Check every 30 seconds
         lastStatusCheck = millis();
         
         if (wifiConfig.mode == DCC_WIFI_STATION || wifiConfig.mode == DCC_WIFI_AP_STATION) {
-            if (WiFi.status() != WL_CONNECTED && strlen(wifiConfig.stationSSID) > 0) {
+            bool isConnected = (WiFi.status() == WL_CONNECTED);
+            
+            if (!isConnected && strlen(wifiConfig.stationSSID) > 0) {
                 Serial.println("WiFi connection lost, attempting to reconnect...");
                 WiFi.begin(wifiConfig.stationSSID, wifiConfig.stationPassword);
+            } else if (isConnected && !wasConnected) {
+                // Just reconnected, restart mDNS
+                Serial.println("WiFi reconnected, restarting mDNS...");
+                MDNS.end();
+                setupMDNS();
             }
+            
+            wasConnected = isConnected;
         }
     }
 }
@@ -1171,6 +1274,7 @@ void printWiFiStatus() {
     }
     
     Serial.printf("MAC Address: %s\n", getMacAddress().c_str());
+    Serial.printf("mDNS Hostname: %s.local\n", getMDNSHostname().c_str());
     Serial.println("==================");
 }
 

@@ -50,6 +50,8 @@ void generateDefaultCredentials();
 bool needsCredentialUpdate();
 String getMacAddress();
 String getLastSixMacChars();
+String getMDNSHostname();
+void setupMDNS();
 void startWebServer();
 void handleRoot();
 void handleConfig();

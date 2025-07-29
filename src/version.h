@@ -2,16 +2,16 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "0.3.1"
+#define SOFTWARE_VERSION "0.3.4"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 3
-#define VERSION_PATCH 1
+#define VERSION_PATCH 4
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define NUMERIC_VERSION 31
+#define NUMERIC_VERSION 34
 
 // Build information
-#define BUILD_DATE "2025-01-28"
+#define BUILD_DATE "2025-01-29"
 #define BUILD_TIME __TIME__
 
 // Project information
@@ -21,6 +21,26 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.3.4 (2025-01-28):\n" \
+"  + Fixed compilation errors with missing ESPmDNS header\n" \
+"  + Completed mDNS functionality with proper includes\n" \
+"  + Enhanced serial commands now fully functional\n" \
+"\n" \
+"v0.3.3 (2025-01-28):\n" \
+"  + Changed mDNS hostname to simple 'dccservo.local'\n" \
+"  + Removed MAC address suffix from hostname for easier access\n" \
+"  + Simplified network discovery with memorable hostname\n" \
+"\n" \
+"v0.3.2 (2025-01-28):\n" \
+"  + Added mDNS functionality for network discovery\n" \
+"  + Device accessible via friendly hostname (dccservo-[mac].local)\n" \
+"  + Enhanced serial console with 'w' command for WiFi status\n" \
+"  + Detailed WiFi status shows IP addresses, SSID, channel, signal strength\n" \
+"  + Added BSSID, security type, and gateway information to status display\n" \
+"  + mDNS service advertisement with device information\n" \
+"  + Automatic mDNS restart on WiFi reconnection\n" \
+"  + Web interface displays clickable mDNS hostname link\n" \
+"\n" \
 "v0.3.1 (2025-01-28):\n" \
 "  + Fixed WiFi scan dropdown population issues\n" \
 "  + Enhanced WiFi scan JavaScript with proper newlines for browser compatibility\n" \
@@ -89,6 +109,9 @@
 "• Enhanced WiFi network scanning with improved browser compatibility\n" \
 "• Robust JSON response formatting with ArduinoJson library\n" \
 "• CORS headers for better web interface compatibility\n" \
+"• mDNS network discovery (accessible via dccservo.local)\n" \
+"• Automatic mDNS service advertisement with device information\n" \
+"• Enhanced serial console with 'w' command for detailed WiFi status\n" \
 "• Factory reset function for complete settings reset\n" \
 "• Individual servo configuration save capability\n" \
 "• Comprehensive servo control table with invert status display\n" \
