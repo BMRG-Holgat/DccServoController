@@ -2,14 +2,14 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "v0.3.10"
+#define SOFTWARE_VERSION "v0.3.19"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 3
-#define VERSION_PATCH 7
+#define VERSION_PATCH 19
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define VERSION_NUMERIC 37
-#define NUMERIC_VERSION 36
+#define VERSION_NUMERIC 319
+#define NUMERIC_VERSION 319
 
 // Build information
 #define BUILD_DATE "2025-01-29"
@@ -22,6 +22,71 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.3.19 (2025-07-29):\n" \
+"  + Improved WiFi test connection error handling\n" \
+"  + Graceful handling of 'Failed to fetch' errors during network testing\n" \
+"  + Added informative warning message for network switch interruptions\n" \
+"  + Enhanced user guidance with explanatory note about test behavior\n" \
+"  + Better user experience during WiFi connectivity testing\n" \
+"\n" \
+"v0.3.18 (2025-07-29):\n" \
+"  + Enhanced WiFi error suppression with more comprehensive logging levels\n" \
+"  + Added detailed EEPROM save/load debugging for WiFi configuration\n" \
+"  + Fixed WiFi mode persistence issue in test connection\n" \
+"  + Improved validation and troubleshooting for WiFi credential persistence\n" \
+"  + Enhanced debugging output for EEPROM WiFi configuration validation\n" \
+"\n" \
+"v0.3.17 (2025-07-29):\n" \
+"  + Enhanced WiFi test connection EEPROM saving with detailed logging\n" \
+"  + Added verification step to confirm credentials are saved correctly\n" \
+"  + Automatic WiFi mode adjustment to enable station mode after successful test\n" \
+"  + Improved debugging output for WiFi credential persistence\n" \
+"  + Fixed potential issue with WiFi mode not enabling saved credentials\n" \
+"\n" \
+"v0.3.16 (2025-07-29):\n" \
+"  + Simplified factory reset button feedback - removed countdown messages\n" \
+"  + Factory reset now triggers automatic ESP32 reboot\n" \
+"  + Clear initiation and completion messages only\n" \
+"  + Added 3-second reboot countdown after factory reset\n" \
+"  + Enhanced factory reset reliability with system restart\n" \
+"\n" \
+"v0.3.15 (2025-07-29):\n" \
+"  + Fixed factory reset button countdown timing issue\n" \
+"  + Countdown now properly decrements from 10 to 0 seconds\n" \
+"  + Eliminated repeated countdown messages at same second\n" \
+"  + Improved countdown message timing accuracy\n" \
+"  + Enhanced button press feedback reliability\n" \
+"\n" \
+"v0.3.14 (2025-07-29):\n" \
+"  + Added GPIO 0 button factory reset functionality\n" \
+"  + Hold BOOT button for 10 seconds to trigger factory reset\n" \
+"  + Visual LED feedback during factory reset process\n" \
+"  + Console progress updates during button hold\n" \
+"  + Automatic WiFi restart after button-triggered reset\n" \
+"  + Enhanced user safety with hold-to-confirm mechanism\n" \
+"\n" \
+"v0.3.13 (2025-07-29):\n" \
+"  + Suppressed WiFi error messages (errno 113 connection abort)\n" \
+"  + Test connection now automatically saves credentials to EEPROM on success\n" \
+"  + Added esp_log configuration to reduce WiFi debugging noise\n" \
+"  + Enhanced user experience with automatic credential persistence\n" \
+"  + Updated test connection feedback messages\n" \
+"\n" \
+"v0.3.12 (2025-07-29):\n" \
+"  + Fixed WiFi network scanning functionality\n" \
+"  + Improved WiFi scan handling for different connection states\n" \
+"  + Fixed JavaScript syntax error in selectNetwork() function\n" \
+"  + Enhanced WiFi scan error handling and debugging\n" \
+"  + Added better WiFi mode management for scanning\n" \
+"\n" \
+"v0.3.11 (2025-07-29):\n" \
+"  + Fixed WiFi credentials persistence - added saveWiFiConfig() calls\n" \
+"  + Removed test scan response functionality\n" \
+"  + Added password visibility toggle buttons for WiFi credentials\n" \
+"  + Added test connection functionality for station SSID/password\n" \
+"  + Improved WiFi configuration user experience\n" \
+"  + Enhanced error handling and user feedback\n" \
+"\n" \
 "v0.3.10 (2025-01-29):\n" \
 "  + Combined heartbeat and DCC signal indication back to single GPIO 2\n" \
 "  + DCC signal flashes take priority over heartbeat (no conflict)\n" \
@@ -158,6 +223,7 @@
 "• DCC receiving signal indicator on GPIO pin 2 (for valid addresses)\n" \
 "• Heartbeat LED indicator on GPIO pin 33 (1 second blink rate)\n" \
 "• Factory reset function for complete settings reset\n" \
+"• GPIO 0 button factory reset (hold BOOT button for 10 seconds)\n" \
 "• Individual servo configuration save capability\n" \
 "• Comprehensive servo control table with invert status display\n" \
 "• Mobile-responsive web interface design\n" \
@@ -177,6 +243,7 @@
 "• ESP32 development board\n" \
 "• DCC signal input on GPIO 4\n" \
 "• Combined heartbeat/DCC indication LED on GPIO 2\n" \
+"• Factory reset button on GPIO 0 (BOOT button)\n" \
 "• Up to 16 servo motors\n" \
 "• 5V power supply for servos\n" \
 "• Servo pins: 5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32"

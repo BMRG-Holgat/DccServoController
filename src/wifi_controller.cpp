@@ -8,6 +8,8 @@
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
+#include <esp_log.h>
+#include <EEPROM.h>
 
 // External references to main module functions and variables
 extern bool dccDebugEnabled;
@@ -50,12 +52,21 @@ String getMDNSHostname() {
 void initializeWiFi() {
     Serial.println("Initializing WiFi...");
     
+    // Suppress WiFi debug messages to avoid errno 113 and connection abort errors
+    esp_log_level_set("wifi", ESP_LOG_NONE);
+    esp_log_level_set("system_api", ESP_LOG_NONE);
+    esp_log_level_set("tcpip_adapter", ESP_LOG_NONE);
+    esp_log_level_set("phy_init", ESP_LOG_NONE);
+    esp_log_level_set("wifi_init", ESP_LOG_NONE);
+    
     // Generate default credentials if not set or if they contain uppercase MAC characters
     if (strlen(wifiConfig.apSSID) == 0 || needsCredentialUpdate()) {
         generateDefaultCredentials();
         // Save the updated credentials
         bootController.isDirty = true;
         putSettings();
+        saveWiFiConfig();
+        Serial.println("Default WiFi credentials generated and saved to EEPROM");
     }
     
     // Set WiFi mode based on configuration
@@ -245,6 +256,7 @@ void startWebServer() {
     webServer.on("/dcc-debug/toggle", HTTP_POST, handleDccDebugToggle);
     webServer.on("/dcc-debug/log", HTTP_GET, handleDccDebugLog);
     webServer.on("/factory-reset", HTTP_POST, handleFactoryReset);
+    webServer.on("/test-wifi", HTTP_POST, handleTestWiFi);
     webServer.onNotFound(handleNotFound);
     
     webServer.begin();
@@ -410,15 +422,22 @@ void handleConfig() {
     html += "<select id='networkSelect' onchange='selectNetwork()' style='width:100%;margin-top:5px;'>";
     html += "<option value=''>Select a network...</option>";
     html += "</select>";
-    html += "<div style='margin-top:10px;'>";
-    html += "<button type='button' class='button' onclick='testScan()' style='background:#2196F3;'>Test Scan Response</button>";
-    html += "</div>";
     html += "</div>";
     html += "</div>";
     
     html += "<div class='form-group'>";
     html += "<label for='stationPassword'>Station Password:</label>";
-    html += "<input type='password' id='stationPassword' name='stationPassword' value='" + String(wifiConfig.stationPassword) + "' maxlength='63' placeholder='Enter password'>";
+    html += "<div style='display:flex;align-items:center;gap:5px;'>";
+    html += "<input type='password' id='stationPassword' name='stationPassword' value='" + String(wifiConfig.stationPassword) + "' maxlength='63' placeholder='Enter password' style='flex:1;'>";
+    html += "<button type='button' class='button' onclick='togglePasswordVisibility(\"stationPassword\")' style='padding:8px 12px;background:#666;'>👁</button>";
+    html += "</div>";
+    html += "<div style='margin-top:10px;'>";
+    html += "<button type='button' class='button' onclick='testStationConnection()' id='testBtn' style='background:#28a745;'>Test Connection</button>";
+    html += "<span id='testResult' style='margin-left:10px;font-weight:bold;'></span>";
+    html += "</div>";
+    html += "<div style='margin-top:5px;font-size:12px;color:#666;'>";
+    html += "ℹ️ Note: Testing will temporarily switch networks. Communication may be interrupted during test - this is normal.";
+    html += "</div>";
     html += "</div>";
     
     // Access Point Settings
@@ -430,7 +449,10 @@ void handleConfig() {
     
     html += "<div class='form-group'>";
     html += "<label for='apPassword'>AP Password:</label>";
-    html += "<input type='password' id='apPassword' name='apPassword' value='" + String(wifiConfig.apPassword) + "' maxlength='63' placeholder='Access point password'>";
+    html += "<div style='display:flex;align-items:center;gap:5px;'>";
+    html += "<input type='password' id='apPassword' name='apPassword' value='" + String(wifiConfig.apPassword) + "' maxlength='63' placeholder='Access point password' style='flex:1;'>";
+    html += "<button type='button' class='button' onclick='togglePasswordVisibility(\"apPassword\")' style='padding:8px 12px;background:#666;'>👁</button>";
+    html += "</div>";
     html += "</div>";
     
     // Buttons
@@ -519,38 +541,87 @@ void handleConfig() {
     html += "  }\n";
     html += "}\n";
     html += "\n";
-    html += "function testScan() {\n";
-    html += "  console.log('Testing scan response...');\n";
-    html += "  const networkSelect = document.getElementById('networkSelect');\n";
+    html += "function togglePasswordVisibility(fieldId) {\n";
+    html += "  const passwordField = document.getElementById(fieldId);\n";
+    html += "  const toggleButton = passwordField.nextElementSibling;\n";
     html += "  \n";
-    html += "  // Simulate a successful scan response for testing\n";
-    html += "  const testData = {\n";
-    html += "    networks: [\n";
-    html += "      {ssid: 'TestNetwork1', rssi: -45, encryption: 'Secured', channel: 6},\n";
-    html += "      {ssid: 'TestNetwork2', rssi: -65, encryption: 'Open', channel: 11}\n";
-    html += "    ],\n";
-    html += "    count: 2\n";
-    html += "  };\n";
-    html += "  \n";
-    html += "  console.log('Test data:', JSON.stringify(testData));\n";
-    html += "  \n";
-    html += "  // Clear existing options\n";
-    html += "  networkSelect.innerHTML = '<option value=\"\">Select a network...</option>';\n";
-    html += "  \n";
-    html += "  if (testData && testData.networks && Array.isArray(testData.networks) && testData.networks.length > 0) {\n";
-    html += "    console.log('Processing', testData.networks.length, 'test networks');\n";
-    html += "    testData.networks.forEach((network, index) => {\n";
-    html += "      console.log('Adding test network:', network.ssid);\n";
-    html += "      const option = document.createElement('option');\n";
-    html += "      option.value = network.ssid;\n";
-    html += "      option.textContent = network.ssid + ' (' + network.rssi + ' dBm, ' + network.encryption + ')';\n";
-    html += "      networkSelect.appendChild(option);\n";
-    html += "    });\n";
-    html += "    console.log('Successfully added', testData.networks.length, 'test networks to dropdown');\n";
+    html += "  if (passwordField.type === 'password') {\n";
+    html += "    passwordField.type = 'text';\n";
+    html += "    toggleButton.textContent = '🙈';\n";
+    html += "    toggleButton.title = 'Hide password';\n";
     html += "  } else {\n";
-    html += "    console.log('Test data structure invalid');\n";
+    html += "    passwordField.type = 'password';\n";
+    html += "    toggleButton.textContent = '👁';\n";
+    html += "    toggleButton.title = 'Show password';\n";
     html += "  }\n";
     html += "}\n";
+    html += "\n";
+    html += "function testStationConnection() {\n";
+    html += "  const stationSSID = document.getElementById('stationSSID').value.trim();\n";
+    html += "  const stationPassword = document.getElementById('stationPassword').value;\n";
+    html += "  const testBtn = document.getElementById('testBtn');\n";
+    html += "  const testResult = document.getElementById('testResult');\n";
+    html += "  \n";
+    html += "  if (!stationSSID) {\n";
+    html += "    testResult.textContent = '❌ Please enter an SSID';\n";
+    html += "    testResult.style.color = '#dc3545';\n";
+    html += "    return;\n";
+    html += "  }\n";
+    html += "  \n";
+    html += "  if (!stationPassword || stationPassword.length < 8) {\n";
+    html += "    testResult.textContent = '❌ Password must be at least 8 characters';\n";
+    html += "    testResult.style.color = '#dc3545';\n";
+    html += "    return;\n";
+    html += "  }\n";
+    html += "  \n";
+    html += "  testBtn.disabled = true;\n";
+    html += "  testBtn.textContent = 'Testing...';\n";
+    html += "  testResult.textContent = '🔄 Testing connection...';\n";
+    html += "  testResult.style.color = '#ffc107';\n";
+    html += "  \n";
+    html += "  fetch('/test-wifi', {\n";
+    html += "    method: 'POST',\n";
+    html += "    headers: {\n";
+    html += "      'Content-Type': 'application/x-www-form-urlencoded'\n";
+    html += "    },\n";
+    html += "    body: 'ssid=' + encodeURIComponent(stationSSID) + '&password=' + encodeURIComponent(stationPassword)\n";
+    html += "  })\n";
+    html += "  .then(response => response.json())\n";
+    html += "  .then(data => {\n";
+    html += "    testBtn.disabled = false;\n";
+    html += "    testBtn.textContent = 'Test Connection';\n";
+    html += "    \n";
+    html += "    if (data.success) {\n";
+    html += "      testResult.textContent = '✅ Connection successful! Credentials automatically saved to EEPROM.';\n";
+    html += "      testResult.style.color = '#28a745';\n";
+    html += "    } else {\n";
+    html += "      testResult.textContent = '❌ Connection failed: ' + (data.error || 'Unknown error');\n";
+    html += "      testResult.style.color = '#dc3545';\n";
+    html += "    }\n";
+    html += "  })\n";
+    html += "  .catch(error => {\n";
+    html += "    testBtn.disabled = false;\n";
+    html += "    testBtn.textContent = 'Test Connection';\n";
+    html += "    \n";
+    html += "    // Handle fetch failures gracefully - these are often expected during WiFi testing\n";
+    html += "    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {\n";
+    html += "      testResult.textContent = '⚠️ Test connection may have succeeded - network switch interrupted communication';\n";
+    html += "      testResult.style.color = '#ffc107'; // Warning color (yellow/orange)\n";
+    html += "    } else {\n";
+    html += "      testResult.textContent = '❌ Test failed: ' + error.message;\n";
+    html += "      testResult.style.color = '#dc3545';\n";
+    html += "    }\n";
+    html += "  });\n";
+    html += "}\n";
+    html += "\n";
+    html += "// Initialize page - clear any previous test results\n";
+    html += "window.onload = function() {\n";
+    html += "  const testResult = document.getElementById('testResult');\n";
+    html += "  if (testResult) {\n";
+    html += "    testResult.textContent = '';\n";
+    html += "    testResult.style.color = '';\n";
+    html += "  }\n";
+    html += "};\n";
     html += "</script>";
     
     html += "</div></body></html>";
@@ -613,7 +684,10 @@ void updateWiFiConfig() {
         bootController.isDirty = true;
         putSettings();
         
-        Serial.println("WiFi configuration updated");
+        // Save WiFi configuration to EEPROM
+        saveWiFiConfig();
+        
+        Serial.println("WiFi configuration updated and saved to EEPROM");
         
         // Restart WiFi with new settings
         WiFi.disconnect();
@@ -1126,7 +1200,10 @@ void handleFactoryReset() {
     bootController.isDirty = true;
     putSettings();
     
-    Serial.println("Factory reset complete. Restarting WiFi...");
+    // Save WiFi configuration to EEPROM
+    saveWiFiConfig();
+    
+    Serial.println("Factory reset complete. WiFi config saved to EEPROM. Restarting WiFi...");
     
     // Restart WiFi
     WiFi.disconnect();
@@ -1144,6 +1221,156 @@ void handleFactoryReset() {
     webServer.send(200, "text/html", html);
 }
 
+void handleTestWiFi() {
+    Serial.println("Testing WiFi connection...");
+    
+    String ssid = webServer.arg("ssid");
+    String password = webServer.arg("password");
+    
+    Serial.println("Testing connection to: " + ssid);
+    
+    // Validate input
+    if (ssid.length() == 0) {
+        String response = "{\"success\":false,\"error\":\"SSID is required\"}";
+        webServer.send(400, "application/json", response);
+        return;
+    }
+    
+    if (password.length() < 8) {
+        String response = "{\"success\":false,\"error\":\"Password must be at least 8 characters\"}";
+        webServer.send(400, "application/json", response);
+        return;
+    }
+    
+    // Store current WiFi state for reference
+    String currentSSID = WiFi.SSID();
+    
+    // Perform the test connection
+    bool testResult = false;
+    String errorMsg = "";
+    
+    // Attempt to connect to the test network
+    Serial.println("Switching to test WiFi network...");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), password.c_str());
+    
+    // Wait for connection attempt (max 15 seconds)
+    unsigned long startTime = millis();
+    
+    while (millis() - startTime < 15000) {
+        if (WiFi.status() == WL_CONNECTED) {
+            testResult = true;
+            break;
+        }
+        delay(500);
+    }
+    
+    // Generate response based on test result
+    String response;
+    if (testResult) {
+        Serial.println("✅ WiFi test connection successful!");
+        Serial.println("Connected to: " + ssid);
+        Serial.println("IP Address: " + WiFi.localIP().toString());
+        
+        // Automatically save successful credentials to EEPROM
+        Serial.println("💾 Automatically saving successful WiFi credentials to EEPROM...");
+        Serial.printf("Saving SSID: '%s' (length: %d)\n", ssid.c_str(), ssid.length());
+        Serial.printf("Saving Password: '%s' (length: %d)\n", password.c_str(), password.length());
+        
+        // Copy test credentials to station configuration
+        strncpy(wifiConfig.stationSSID, ssid.c_str(), WIFI_SSID_MAX_LENGTH - 1);
+        wifiConfig.stationSSID[WIFI_SSID_MAX_LENGTH - 1] = '\0';
+        strncpy(wifiConfig.stationPassword, password.c_str(), WIFI_PASSWORD_MAX_LENGTH - 1);
+        wifiConfig.stationPassword[WIFI_PASSWORD_MAX_LENGTH - 1] = '\0';
+        
+        // Verify the credentials were copied correctly
+        Serial.printf("Verification - SSID: '%s'\n", wifiConfig.stationSSID);
+        Serial.printf("Verification - Password: '%s'\n", wifiConfig.stationPassword);
+        
+        // Save to EEPROM
+        Serial.println("Marking bootController as dirty and saving settings...");
+        bootController.isDirty = true;
+        putSettings();
+        
+        Serial.println("Saving WiFi config to EEPROM...");
+        saveWiFiConfig();
+        
+        // Verify credentials were saved by reloading them
+        Serial.println("Verifying credentials were saved correctly...");
+        WiFiConfig tempConfig;
+        int eeAddr = sizeof(bootController) + sizeof(virtualservo);
+        EEPROM.get(eeAddr, tempConfig);
+        Serial.printf("Saved SSID in EEPROM: '%s'\n", tempConfig.stationSSID);
+        Serial.printf("Saved Password in EEPROM: '%s'\n", tempConfig.stationPassword);
+        
+        // Update WiFi mode to ensure station mode is enabled
+        if (wifiConfig.mode == DCC_WIFI_AP) {
+            wifiConfig.mode = DCC_WIFI_AP_STATION;  // Enable both AP and Station
+            Serial.println("Updated WiFi mode to AP+Station to enable saved credentials");
+        } else if (wifiConfig.mode == DCC_WIFI_OFF) {
+            wifiConfig.mode = DCC_WIFI_STATION;  // Enable Station mode
+            Serial.println("Updated WiFi mode to Station to enable saved credentials");
+        }
+        
+        // Save the updated WiFi mode to EEPROM as well
+        Serial.println("Saving updated WiFi mode to EEPROM...");
+        saveWiFiConfig();  // Save again to ensure mode change is persisted
+        
+        Serial.println("✅ WiFi credentials saved to EEPROM successfully!");
+        Serial.println("Connection will remain active - configuration is now permanent.");
+        Serial.println("Note: Any following connection errors are normal cleanup messages and can be ignored.");
+        response = "{\"success\":true,\"message\":\"Connection successful and credentials saved to EEPROM\"}";
+    } else {
+        switch (WiFi.status()) {
+            case WL_NO_SSID_AVAIL:
+                errorMsg = "Network not found";
+                break;
+            case WL_CONNECT_FAILED:
+                errorMsg = "Wrong password or connection failed";
+                break;
+            case WL_CONNECTION_LOST:
+                errorMsg = "Connection lost";
+                break;
+            case WL_DISCONNECTED:
+                errorMsg = "Disconnected";
+                break;
+            default:
+                errorMsg = "Connection timeout";
+                break;
+        }
+        
+        Serial.println("❌ WiFi test connection failed: " + errorMsg);
+        response = "{\"success\":false,\"error\":\"" + errorMsg + "\"}";
+    }
+    
+    // Send response
+    if (testResult) {
+        webServer.send(200, "application/json", response);
+        Serial.println("✅ Test connection completed successfully - credentials automatically saved to EEPROM");
+        // Don't restore WiFi - leave the successful connection active
+        // Configuration is now permanent and saved
+    } else {
+        webServer.send(400, "application/json", response);
+        
+        // Only restore original WiFi configuration if test failed
+        Serial.println("🔄 Test failed - restoring original WiFi configuration...");
+        delay(100);
+        
+        // Disconnect from failed test network
+        WiFi.disconnect();
+        delay(500);
+        
+        // Fully restore the original WiFi configuration
+        WiFi.mode(WIFI_OFF);
+        delay(500);
+        
+        // Restart WiFi with the original configuration
+        Serial.println("Reinitializing WiFi...");
+        initializeWiFi();
+        Serial.println("WiFi restoration complete");
+    }
+}
+
 void handleNotFound() {
     webServer.send(404, "text/plain", "404: Not Found");
 }
@@ -1156,13 +1383,27 @@ void handleWiFiScan() {
     webServer.sendHeader("Access-Control-Allow-Methods", "GET");
     webServer.sendHeader("Access-Control-Allow-Headers", "Content-Type");
     
+    // Store current WiFi state
+    WiFiMode_t currentMode = WiFi.getMode();
+    bool wasConnected = WiFi.isConnected();
+    String currentSSID = WiFi.SSID();
+    
+    Serial.printf("Current WiFi mode: %d, Connected: %s, SSID: %s\n", 
+                  currentMode, wasConnected ? "Yes" : "No", currentSSID.c_str());
+    
     // Ensure WiFi is in a good state for scanning
-    if (WiFi.getMode() == WIFI_OFF) {
+    if (currentMode == WIFI_OFF) {
+        Serial.println("Enabling WiFi for scanning...");
         WiFi.mode(WIFI_STA);
-        delay(100);
+        delay(500);
+    } else if (currentMode == WIFI_AP) {
+        Serial.println("Switching to AP+STA mode for scanning...");
+        WiFi.mode(WIFI_AP_STA);
+        delay(500);
     }
     
     // Start WiFi scan
+    Serial.println("Starting WiFi scan...");
     int numNetworks = WiFi.scanNetworks(false, true); // async=false, show_hidden=true
     
     Serial.printf("WiFi scan found %d networks\n", numNetworks);
@@ -1197,9 +1438,14 @@ void handleWiFiScan() {
                          validNetworks, ssid.c_str(), rssi, channel, 
                          encryption == WIFI_AUTH_OPEN ? "Open" : "Secured");
         }
+    } else if (numNetworks == 0) {
+        Serial.println("No networks found during scan");
+    } else {
+        Serial.printf("Scan failed with error code: %d\n", numNetworks);
     }
     
     doc["count"] = validNetworks;
+    doc["status"] = (numNetworks >= 0) ? "success" : "error";
     
     // Clean up scan results
     WiFi.scanDelete();

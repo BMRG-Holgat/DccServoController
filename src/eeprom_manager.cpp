@@ -104,9 +104,17 @@ void putSettings() {
 void saveWiFiConfig() {
     // WiFi config is stored after controller and servo data
     int eeAddr = sizeof(bootController) + sizeof(virtualservo);
+    
+    // Debug: Show what we're about to save
+    Serial.printf("Saving to EEPROM - Mode: %d, Enabled: %s\n", wifiConfig.mode, wifiConfig.enabled ? "true" : "false");
+    Serial.printf("Saving Station SSID: '%s'\n", wifiConfig.stationSSID);
+    Serial.printf("Saving Station Password: '%s'\n", wifiConfig.stationPassword);
+    Serial.printf("Saving AP SSID: '%s'\n", wifiConfig.apSSID);
+    Serial.printf("EEPROM address: %d\n", eeAddr);
+    
     EEPROM.put(eeAddr, wifiConfig);
     EEPROM.commit(); // ESP32 specific - commit changes to flash
-    Serial.println("WiFi configuration saved to EEPROM");
+    Serial.println("✅ WiFi configuration saved to EEPROM and committed");
 }
 
 void loadWiFiConfig() {
@@ -117,14 +125,24 @@ void loadWiFiConfig() {
     WiFiConfig tempConfig;
     EEPROM.get(eeAddr, tempConfig);
     
+    // Debug: Show what was loaded from EEPROM
+    Serial.printf("Loaded from EEPROM - Mode: %d, Enabled: %s\n", tempConfig.mode, tempConfig.enabled ? "true" : "false");
+    Serial.printf("Loaded Station SSID: '%s'\n", tempConfig.stationSSID);
+    Serial.printf("Loaded Station Password: '%s'\n", tempConfig.stationPassword);
+    Serial.printf("Loaded AP SSID: '%s'\n", tempConfig.apSSID);
+    
     // Check if the loaded config appears to be valid (magic number check would be better)
     // For now, check if the mode is within valid range and enabled flag makes sense
     bool configValid = (tempConfig.mode >= DCC_WIFI_OFF && tempConfig.mode <= DCC_WIFI_AP_STATION);
     
+    Serial.printf("Config validation: mode valid = %s, AP SSID length = %d\n", 
+                  configValid ? "true" : "false", strlen(tempConfig.apSSID));
+    
     if (configValid && strlen(tempConfig.apSSID) > 0) {
         // Config appears valid, use it
         wifiConfig = tempConfig;
-        Serial.println("WiFi configuration loaded from EEPROM");
+        Serial.println("✅ WiFi configuration loaded from EEPROM and validated");
+        Serial.printf("Active Mode: %d, Station SSID: '%s'\n", wifiConfig.mode, wifiConfig.stationSSID);
     } else {
         // Config is invalid or uninitialized, set defaults
         Serial.println("WiFi configuration invalid or uninitialized, setting defaults");

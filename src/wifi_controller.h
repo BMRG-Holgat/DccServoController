@@ -59,6 +59,7 @@ void handleServoControl();
 void handleServoConfig();
 void updateServoConfig();
 void handleFactoryReset();
+void handleTestWiFi();
 void handleNotFound();
 void handleWiFiScan();
 void updateWiFiConfig();
