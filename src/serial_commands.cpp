@@ -4,6 +4,7 @@
 #include "wifi_controller.h"
 #include "config.h"
 #include "version.h"
+#include "utils/dcc_debug_logger.h"
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 
@@ -797,14 +798,13 @@ void processMDNSTestCommand() {
 
 void processDccDebugCommand() {
     extern void toggleDccDebug();
-    extern bool dccDebugEnabled;
     
     toggleDccDebug();
     
     Serial.println("=== DCC Debug Mode ===");
-    Serial.printf("Status: %s\n", dccDebugEnabled ? "ENABLED" : "DISABLED");
+    Serial.printf("Status: %s\n", dccDebugLogger.isDebugEnabled() ? "ENABLED" : "DISABLED");
     
-    if (dccDebugEnabled) {
+    if (dccDebugLogger.isDebugEnabled()) {
         Serial.println("DCC packet monitoring is now active.");
         Serial.println("You will see debug output for:");
         Serial.println("• All received DCC accessory packets");

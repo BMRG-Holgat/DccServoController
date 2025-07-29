@@ -2,14 +2,14 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "v0.3.19"
+#define SOFTWARE_VERSION "v0.4.0"
 #define VERSION_MAJOR 0
-#define VERSION_MINOR 3
-#define VERSION_PATCH 19
+#define VERSION_MINOR 4
+#define VERSION_PATCH 0
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define VERSION_NUMERIC 319
-#define NUMERIC_VERSION 319
+#define VERSION_NUMERIC 400
+#define NUMERIC_VERSION 400
 
 // Build information
 #define BUILD_DATE "2025-01-29"
@@ -22,6 +22,18 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.4.0 (2025-01-29):\n" \
+"  + MAJOR CODE REFACTORING: Improved architecture and maintainability\n" \
+"  + Created Hardware Abstraction Layer with LedController class\n" \
+"  + Added FactoryResetController for button management with callbacks\n" \
+"  + Implemented DccDebugLogger for centralized debug log management\n" \
+"  + Created SystemManager for coordinated module initialization and updates\n" \
+"  + Separated concerns: hardware, utilities, core systems\n" \
+"  + Improved error handling and code organization\n" \
+"  + Enhanced modularity and testability\n" \
+"  + Cleaner main.cpp with reduced complexity\n" \
+"  + Better separation of business logic from hardware control\n" \
+"\n" \
 "v0.3.19 (2025-07-29):\n" \
 "  + Improved WiFi test connection error handling\n" \
 "  + Graceful handling of 'Failed to fetch' errors during network testing\n" \

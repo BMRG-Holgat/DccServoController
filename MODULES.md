@@ -1,5 +1,78 @@
 # Module Documentation
 
+## Architecture Overview (v0.4.0)
+The ESP32 DCC Servo Controller has been refactored into a clean, modular architecture with clear separation of concerns:
+
+- **Core**: System coordination and management
+- **Hardware**: Hardware abstraction layer for GPIO, LEDs, buttons
+- **Utils**: Utility classes for logging and debugging
+- **Business Logic**: Servo control, DCC handling, WiFi management
+
+## Core Modules
+
+### System Manager (core/system_manager.h/cpp)
+Central coordinator for all system components with clean initialization and update lifecycle.
+
+**Key Features:**
+- Coordinates all hardware and software modules
+- Manages system timing and servo updates
+- Provides clean separation between main.cpp and business logic
+- Handles factory reset callbacks and system state
+
+**Key Functions:**
+- `begin()` - Initialize all system components
+- `update()` - Main system update loop
+- `triggerDccSignal()` - Coordinate DCC signal indication
+- `toggleDccDebug()` - Toggle debug mode
+
+## Hardware Abstraction Layer
+
+### LED Controller (hardware/led_controller.h/cpp)
+Manages heartbeat and DCC signal indication with proper state management.
+
+**Key Features:**
+- Combined heartbeat/DCC signal LED functionality
+- Non-blocking LED state management
+- Priority system (DCC signal takes precedence over heartbeat)
+- LED testing and rapid blink functionality
+
+**Key Functions:**
+- `begin()` - Initialize LED hardware
+- `updateHeartbeat()` - Update heartbeat LED state
+- `triggerDccSignal()` - Trigger DCC signal indication
+- `rapidBlink()` - Rapid blinking for visual feedback
+
+### Factory Reset Controller (hardware/factory_reset_controller.h/cpp)
+Manages GPIO button-based factory reset with proper timing and callbacks.
+
+**Key Features:**
+- Non-blocking button press detection
+- Configurable hold time (default: 10 seconds)
+- Callback-based architecture for clean separation
+- Automatic system restart after reset
+
+**Key Functions:**
+- `begin()` - Initialize button hardware
+- `update()` - Non-blocking button state monitoring
+- `setResetCallback()` - Set factory reset callback function
+
+## Utility Modules
+
+### DCC Debug Logger (utils/dcc_debug_logger.h/cpp)
+Centralized logging system for DCC debug messages with circular buffer.
+
+**Key Features:**
+- Circular buffer for efficient memory usage
+- Timestamp tracking for all messages
+- Debug mode enable/disable functionality
+- Web interface integration for log display
+
+**Key Functions:**
+- `addMessage()` - Add debug message to log
+- `toggleDebug()` - Toggle debug mode
+- `getFormattedLogHtml()` - Get HTML formatted log for web interface
+- `clearLog()` - Clear all log messages
+
 ## Configuration Module (config.h)
 Centralized configuration constants and pin definitions.
 
@@ -7,6 +80,7 @@ Centralized configuration constants and pin definitions.
 - `TOTAL_PINS` - Number of servo pins (16)
 - `BASE_PIN` - First servo pin (GPIO 5)
 - `DCC_PIN` - DCC input pin (GPIO 4)
+- `HEARTBEAT_PIN` - LED pin (GPIO 2)
 - `SERVO_UPDATE_INTERVAL` - Servo update timing (15ms)
 - `LED_BLINK_CYCLES` - LED timing cycles
 - `SERVO_CENTER_POSITION` - Default servo center (90°)

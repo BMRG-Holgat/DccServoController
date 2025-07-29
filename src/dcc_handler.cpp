@@ -1,10 +1,10 @@
 #include "dcc_handler.h"
 #include "servo_controller.h"
 #include "config.h"
+#include "utils/dcc_debug_logger.h"
 
 // External functions from main.cpp
 extern void triggerDccSignal();
-extern bool dccDebugEnabled;
 extern void addDccLogMessage(const String& message);
 
 // Global DCC objects
@@ -67,7 +67,7 @@ void notifyDccAccTurnoutOutput(uint16_t Addr, uint8_t Direction, uint8_t OutputP
     }
     
     // Debug output if enabled
-    if (dccDebugEnabled) {
+    if (dccDebugLogger.isDebugEnabled()) {
         String debugMsg = "Addr=" + String(Addr) + ", Dir=" + String(Direction) + 
                          ", Pwr=" + String(OutputPower, HEX) + (isOurAddress ? " [MATCH]" : " [ignore]");
         Serial.print("DCC RX: ");
@@ -93,7 +93,7 @@ void notifyDccAccTurnoutOutput(uint16_t Addr, uint8_t Direction, uint8_t OutputP
                 targetVirtualServo->state = SERVO_TO_THROWN;
             }
             
-            if (dccDebugEnabled) {
+            if (dccDebugLogger.isDebugEnabled()) {
                 String servoMsg = "Servo action: Pin " + String(targetVirtualServo->pin) + 
                                 " -> " + String(Direction == 0 ? "CLOSED" : "THROWN");
                 Serial.println(servoMsg);

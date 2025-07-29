@@ -10,14 +10,10 @@
 #include <ESPmDNS.h>
 #include <esp_log.h>
 #include <EEPROM.h>
+#include "utils/dcc_debug_logger.h"
 
-// External references to main module functions and variables
-extern bool dccDebugEnabled;
+// External references to main module functions
 extern void toggleDccDebug();
-extern String dccLogBuffer[];
-extern int dccLogIndex;
-extern int dccLogCount;
-extern unsigned long dccLogTimestamp[];
 
 // Global WiFi objects
 WiFiConfig wifiConfig;
@@ -1621,7 +1617,7 @@ void handleDccDebug() {
     // Status panel
     html += "<div class=\"status-panel\">\n";
     html += "<h3>Current Status</h3>\n";
-    html += "<p><strong>DCC Debug Mode:</strong> " + String(dccDebugEnabled ? "ENABLED" : "DISABLED") + "</p>\n";
+    html += "<p><strong>DCC Debug Mode:</strong> " + String(dccDebugLogger.isDebugEnabled() ? "ENABLED" : "DISABLED") + "</p>\n";
     html += "<p><strong>Configured Servo Addresses:</strong> ";
     
     // Add servo addresses
@@ -1639,8 +1635,8 @@ void handleDccDebug() {
     
     // Controls
     html += "<div class=\"controls\">\n";
-    html += "<button class=\"btn " + String(dccDebugEnabled ? "danger" : "success") + "\" onclick=\"toggleDebug()\">";
-    html += dccDebugEnabled ? "Disable Debug" : "Enable Debug";
+    html += "<button class=\"btn " + String(dccDebugLogger.isDebugEnabled() ? "danger" : "success") + "\" onclick=\"toggleDebug()\">";
+    html += dccDebugLogger.isDebugEnabled() ? "Disable Debug" : "Enable Debug";
     html += "</button>\n";
     html += "<button id=\"refresh-btn\" class=\"btn danger\" onclick=\"toggleAutoRefresh()\">Pause Auto-Refresh</button>\n";
     html += "<button class=\"btn\" onclick=\"clearLog()\">Clear Display</button>\n";
@@ -1669,24 +1665,20 @@ void handleDccDebug() {
 // DCC Debug toggle handler
 void handleDccDebugToggle() {
     toggleDccDebug();
-    webServer.send(200, "text/plain", dccDebugEnabled ? "DEBUG_ENABLED" : "DEBUG_DISABLED");
+    webServer.send(200, "text/plain", dccDebugLogger.isDebugEnabled() ? "DEBUG_ENABLED" : "DEBUG_DISABLED");
 }
 
 // DCC Debug log data handler
 void handleDccDebugLog() {
     String logHtml = "";
     
-    if (dccLogCount == 0) {
+    if (dccDebugLogger.getLogCount() == 0) {
         logHtml = "<div class=\"log-entry\">No DCC packets logged yet...</div>";
     } else {
         // Display log entries in chronological order (oldest first)
-        int startIndex = (dccLogCount < DCC_LOG_SIZE) ? 0 : dccLogIndex;
-        
-        for (int i = 0; i < dccLogCount; i++) {
-            int index = (startIndex + i) % DCC_LOG_SIZE;
-            
+        for (int i = 0; i < dccDebugLogger.getLogCount(); i++) {
             // Format timestamp
-            unsigned long timestamp = dccLogTimestamp[index];
+            unsigned long timestamp = dccDebugLogger.getLogTimestamp(i);
             unsigned long seconds = timestamp / 1000;
             unsigned long milliseconds = timestamp % 1000;
             
@@ -1694,17 +1686,19 @@ void handleDccDebugLog() {
             if (milliseconds < 100) timestampStr = String(seconds) + ".0" + String(milliseconds);
             if (milliseconds < 10) timestampStr = String(seconds) + ".00" + String(milliseconds);
             
+            String message = dccDebugLogger.getLogMessage(i);
+            
             // Determine entry class based on content
             String entryClass = "log-entry";
-            if (dccLogBuffer[index].indexOf("[MATCH]") != -1) {
+            if (message.indexOf("[MATCH]") != -1) {
                 entryClass += " log-match";
-            } else if (dccLogBuffer[index].indexOf("[ignore]") != -1) {
+            } else if (message.indexOf("[ignore]") != -1) {
                 entryClass += " log-ignore";
             }
             
             logHtml += "<div class=\"" + entryClass + "\">";
             logHtml += "<span class=\"log-timestamp\">" + timestampStr + "s</span>";
-            logHtml += dccLogBuffer[index];
+            logHtml += message;
             logHtml += "</div>";
         }
     }
