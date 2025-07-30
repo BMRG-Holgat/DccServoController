@@ -2,14 +2,14 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "v0.4.2"
+#define SOFTWARE_VERSION "v0.4.3"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 4
-#define VERSION_PATCH 2
+#define VERSION_PATCH 3
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define VERSION_NUMERIC 402
-#define NUMERIC_VERSION 402
+#define VERSION_NUMERIC 403
+#define NUMERIC_VERSION 403
 
 // Build information
 #define BUILD_DATE "2025-07-30"
@@ -22,6 +22,17 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.4.3 (2025-07-30):\n" \
+"  + HOSTNAME CONFIGURATION: Added customizable device hostname for mDNS\n" \
+"  + Users can now set custom hostname via web interface and serial commands\n" \
+"  + Enhanced mDNS functionality with user-defined hostnames (e.g., mycontroller.local)\n" \
+"  + Added 'hostname [name]' serial command for hostname management\n" \
+"  + WIFI CORRUPTION FIX: Robust detection and recovery from EEPROM structure changes\n" \
+"  + Fixed DHCP issues caused by corrupted WiFi configuration data\n" \
+"  + Enhanced EEPROM validation to detect and repair corrupted IP settings\n" \
+"  + Automatic reset and recovery when structure corruption is detected\n" \
+"  + Improved debugging output for WiFi configuration troubleshooting\n" \
+"\n" \
 "v0.4.2 (2025-07-30):\n" \
 "  + WEB INTERFACE ERROR MESSAGE IMPROVEMENTS: Fixed 'undefined' error messages\n" \
 "  + Enhanced Save All Configuration to show proper 'No changes to save' message\n" \
@@ -246,7 +257,8 @@
 "• Enhanced WiFi network scanning with improved browser compatibility\n" \
 "• Robust JSON response formatting with ArduinoJson library\n" \
 "• CORS headers for better web interface compatibility\n" \
-"• mDNS network discovery (accessible via dccservo.local)\n" \
+"• mDNS network discovery with customizable hostname (hostname.local)\n" \
+"• User-configurable device hostname via web interface and serial commands\n" \
 "• Automatic mDNS service advertisement with device information\n" \
 "• Enhanced serial console with 'w' command for detailed WiFi status\n" \
 "• DCC debug mode with 'z' command for packet monitoring\n" \

@@ -41,7 +41,10 @@ String getLastSixMacChars() {
 }
 
 String getMDNSHostname() {
-    // Use simple static hostname instead of MAC-based
+    // Use configured hostname, fallback to default if empty
+    if (strlen(wifiConfig.hostname) > 0) {
+        return String(wifiConfig.hostname);
+    }
     return "dccservo";
 }
 
@@ -322,6 +325,7 @@ void handleRoot() {
     // Device Information Card
     html += "<div class='info-card'>";
     html += "<h3>Device Information</h3>";
+    html += "<div class='info-item'><span class='info-label'>Hostname:</span><span class='info-value'>" + getMDNSHostname() + "</span></div>";
     html += "<div class='info-item'><span class='info-label'>MAC Address:</span><span class='info-value'>" + getMacAddress() + "</span></div>";
     
     // Access methods section
@@ -397,6 +401,13 @@ void handleConfig() {
     html += "<option value='1'" + String(wifiConfig.mode == DCC_WIFI_AP ? " selected" : "") + ">Access Point Only</option>";
     html += "<option value='2'" + String(wifiConfig.mode == DCC_WIFI_STATION ? " selected" : "") + ">Station Only (with AP fallback)</option>";
     html += "</select>";
+    html += "</div>";
+    
+    // Hostname Settings
+    html += "<div class='form-group'>";
+    html += "<label for='hostname'>Device Hostname:</label>";
+    html += "<input type='text' id='hostname' name='hostname' value='" + String(wifiConfig.hostname) + "' maxlength='31' placeholder='dccservo' pattern='[a-zA-Z0-9-]{1,31}' title='Hostname must contain only letters, numbers, and hyphens'>";
+    html += "<small style='color:#666;font-size:12px;margin-top:5px;display:block;'>Used for mDNS (e.g., hostname.local). Only letters, numbers, and hyphens allowed.</small>";
     html += "</div>";
     
     // Station Settings
@@ -673,6 +684,38 @@ void updateWiFiConfig() {
             strncpy(wifiConfig.apPassword, newPassword.c_str(), WIFI_PASSWORD_MAX_LENGTH - 1);
             wifiConfig.apPassword[WIFI_PASSWORD_MAX_LENGTH - 1] = '\0';
             configChanged = true;
+        }
+    }
+    
+    // Update hostname
+    if (webServer.hasArg("hostname")) {
+        String newHostname = webServer.arg("hostname");
+        // Validate hostname format (RFC requirements)
+        bool validHostname = true;
+        if (newHostname.length() == 0 || newHostname.length() > 31) {
+            validHostname = false;
+        } else {
+            for (int i = 0; i < newHostname.length(); i++) {
+                char c = newHostname.charAt(i);
+                if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || 
+                      (c >= '0' && c <= '9') || c == '-')) {
+                    validHostname = false;
+                    break;
+                }
+            }
+            // Hostname cannot start or end with hyphen
+            if (newHostname.charAt(0) == '-' || newHostname.charAt(newHostname.length()-1) == '-') {
+                validHostname = false;
+            }
+        }
+        
+        if (validHostname && newHostname != String(wifiConfig.hostname)) {
+            strncpy(wifiConfig.hostname, newHostname.c_str(), WIFI_HOSTNAME_MAX_LENGTH - 1);
+            wifiConfig.hostname[WIFI_HOSTNAME_MAX_LENGTH - 1] = '\0';
+            configChanged = true;
+            Serial.printf("Hostname updated to: %s\n", wifiConfig.hostname);
+        } else if (!validHostname) {
+            Serial.printf("Invalid hostname format: %s\n", newHostname.c_str());
         }
     }
     

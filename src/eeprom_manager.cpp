@@ -121,6 +121,9 @@ void loadWiFiConfig() {
     // WiFi config is stored after controller and servo data
     int eeAddr = sizeof(bootController) + sizeof(virtualservo);
     
+    Serial.printf("DEBUG: WiFiConfig structure size: %d bytes\n", sizeof(WiFiConfig));
+    Serial.printf("DEBUG: Loading WiFi config from EEPROM address: %d\n", eeAddr);
+    
     // Create a temporary structure to validate loaded data
     WiFiConfig tempConfig;
     EEPROM.get(eeAddr, tempConfig);
@@ -131,18 +134,77 @@ void loadWiFiConfig() {
     Serial.printf("Loaded Station Password: '%s'\n", tempConfig.stationPassword);
     Serial.printf("Loaded AP SSID: '%s'\n", tempConfig.apSSID);
     
-    // Check if the loaded config appears to be valid (magic number check would be better)
-    // For now, check if the mode is within valid range and enabled flag makes sense
+    // Check if the loaded config appears to be valid
+    // After adding hostname field, old configs may be corrupted, so be more strict
     bool configValid = (tempConfig.mode >= DCC_WIFI_OFF && tempConfig.mode <= DCC_WIFI_STATION);
     
-    Serial.printf("Config validation: mode valid = %s, AP SSID length = %d\n", 
-                  configValid ? "true" : "false", strlen(tempConfig.apSSID));
+    // Additional validation: check if SSID contains reasonable characters
+    bool ssidValid = true;
+    for (int i = 0; i < WIFI_SSID_MAX_LENGTH && tempConfig.apSSID[i] != '\0'; i++) {
+        if (tempConfig.apSSID[i] < 32 || tempConfig.apSSID[i] > 126) {
+            ssidValid = false;
+            break;
+        }
+    }
+    
+    // Check for corrupted IP addresses (DNS servers appearing in wrong fields)
+    bool ipValid = true;
+    uint32_t staticIPValue = (uint32_t)tempConfig.staticIP;
+    uint32_t gatewayValue = (uint32_t)tempConfig.gateway;
+    
+    // Detect if DNS servers (8.8.8.8 or 8.8.4.4) are in static IP or gateway fields
+    // This indicates structure corruption from the hostname field addition
+    if (staticIPValue == IPAddress(8, 8, 4, 4) || staticIPValue == IPAddress(8, 8, 8, 8) ||
+        gatewayValue == IPAddress(8, 8, 4, 4) || gatewayValue == IPAddress(8, 8, 8, 8)) {
+        Serial.println("⚠ CORRUPTION DETECTED: DNS servers found in IP config fields");
+        Serial.printf("Static IP: %s, Gateway: %s\n", 
+                      tempConfig.staticIP.toString().c_str(), tempConfig.gateway.toString().c_str());
+        ipValid = false;
+    }
+    
+    // Check hostname field for corruption
+    bool hostnameValid = true;
+    if (strlen(tempConfig.hostname) > 0) {
+        for (int i = 0; i < strlen(tempConfig.hostname) && i < WIFI_HOSTNAME_MAX_LENGTH; i++) {
+            char c = tempConfig.hostname[i];
+            if (c < 32 || c > 126) {
+                hostnameValid = false;
+                break;
+            }
+        }
+    }
+    
+    // Overall validation - all checks must pass
+    configValid = configValid && ssidValid && ipValid && hostnameValid;
+    
+    // Check for completely garbage data (common after structure changes)
+    if (!ssidValid || strlen(tempConfig.apSSID) == 0 || !ipValid) {
+        Serial.println("WiFi config appears corrupted (likely due to structure change), forcing reset");
+        configValid = false;
+    }
+    
+    Serial.printf("Config validation: mode=%s, SSID=%s, IP=%s, hostname=%s, overall=%s\n", 
+                  (tempConfig.mode >= DCC_WIFI_OFF && tempConfig.mode <= DCC_WIFI_STATION) ? "OK" : "BAD",
+                  ssidValid ? "OK" : "BAD", 
+                  ipValid ? "OK" : "BAD",
+                  hostnameValid ? "OK" : "BAD",
+                  configValid ? "VALID" : "INVALID");
     
     if (configValid && strlen(tempConfig.apSSID) > 0) {
         // Config appears valid, use it
         wifiConfig = tempConfig;
+        
+        // Ensure hostname is set (for backward compatibility with older configs)
+        if (strlen(wifiConfig.hostname) == 0) {
+            strncpy(wifiConfig.hostname, "dccservo", WIFI_HOSTNAME_MAX_LENGTH - 1);
+            wifiConfig.hostname[WIFI_HOSTNAME_MAX_LENGTH - 1] = '\0';
+            Serial.println("Set default hostname for existing configuration");
+            saveWiFiConfig();  // Save the updated config with hostname
+        }
+        
         Serial.println("✅ WiFi configuration loaded from EEPROM and validated");
         Serial.printf("Active Mode: %d, Station SSID: '%s'\n", wifiConfig.mode, wifiConfig.stationSSID);
+        Serial.printf("Hostname: %s\n", wifiConfig.hostname);
     } else {
         // Config is invalid or uninitialized, set defaults
         Serial.println("WiFi configuration invalid or uninitialized, setting defaults");
@@ -150,7 +212,21 @@ void loadWiFiConfig() {
         wifiConfig.mode = DCC_WIFI_AP;
         memset(wifiConfig.stationSSID, 0, WIFI_SSID_MAX_LENGTH);
         memset(wifiConfig.stationPassword, 0, WIFI_PASSWORD_MAX_LENGTH);
+        memset(wifiConfig.hostname, 0, WIFI_HOSTNAME_MAX_LENGTH);
+        strncpy(wifiConfig.hostname, "dccservo", WIFI_HOSTNAME_MAX_LENGTH - 1);
+        wifiConfig.hostname[WIFI_HOSTNAME_MAX_LENGTH - 1] = '\0';
         wifiConfig.useStaticIP = false;
+        
+        // Reset all IP fields to proper defaults (not corrupted DNS addresses)
+        wifiConfig.staticIP = IPAddress(192, 168, 1, 100);
+        wifiConfig.gateway = IPAddress(192, 168, 1, 1);
+        wifiConfig.subnet = IPAddress(255, 255, 255, 0);
+        wifiConfig.dns1 = IPAddress(8, 8, 8, 8);
+        wifiConfig.dns2 = IPAddress(8, 8, 4, 4);
+        
+        Serial.printf("Reset to defaults - Hostname: %s\n", wifiConfig.hostname);
+        Serial.printf("Reset to defaults - Static IP: %s, Gateway: %s\n", 
+                      wifiConfig.staticIP.toString().c_str(), wifiConfig.gateway.toString().c_str());
         
         // Generate default AP credentials
         generateDefaultCredentials();
@@ -186,6 +262,8 @@ void factoryResetAll() {
     wifiConfig.enabled = true;
     memset(wifiConfig.stationSSID, 0, WIFI_SSID_MAX_LENGTH);
     memset(wifiConfig.stationPassword, 0, WIFI_PASSWORD_MAX_LENGTH);
+    strncpy(wifiConfig.hostname, "dccservo", WIFI_HOSTNAME_MAX_LENGTH - 1);
+    wifiConfig.hostname[WIFI_HOSTNAME_MAX_LENGTH - 1] = '\0';
     
     // Save all settings
     putSettings();

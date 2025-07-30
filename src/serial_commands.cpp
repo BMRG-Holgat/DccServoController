@@ -131,6 +131,7 @@ void processSerialCommands() {
             Serial.println("factory - Factory reset (clears WiFi and servo settings)");
             Serial.println("history - Show version history and changelog");
             Serial.println("mdns - Test mDNS functionality and restart if needed");
+            Serial.println("hostname [name] - Show/set device hostname for mDNS");
             Serial.println();
             Serial.println("Servo numbers: 0-15 (maps to GPIO pins automatically)");
             Serial.println("GPIO pins can also be used directly");
@@ -158,6 +159,8 @@ void processSerialCommands() {
                 Serial.println(VERSION_HISTORY);
             } else if (command.startsWith("mdns")) {
                 processMDNSTestCommand();
+            } else if (command.startsWith("hostname ")) {
+                processHostnameCommand();
             } else {
                 Serial.println("Unknown command. Type 'h' for help.");
             }
@@ -791,6 +794,95 @@ void processMDNSTestCommand() {
     }
     
     Serial.println("==================");
+}
+
+void processHostnameCommand() {
+    // Command format: hostname <new_hostname>
+    String command = String(receivedChars);
+    
+    // Remove "hostname " prefix to get the new hostname
+    String newHostname = command.substring(9);  // "hostname ".length() = 9
+    newHostname.trim();
+    
+    if (newHostname.length() == 0) {
+        // Show current hostname
+        Serial.println("=== Device Hostname ===");
+        Serial.printf("Current hostname: %s\n", wifiConfig.hostname);
+        Serial.printf("mDNS address: %s.local\n", wifiConfig.hostname);
+        Serial.println("\nTo change hostname: hostname <new_name>");
+        Serial.println("Example: hostname mycontroller");
+        Serial.println("Rules: 1-31 chars, letters/numbers/hyphens only, no hyphens at start/end");
+        return;
+    }
+    
+    // Validate hostname format (RFC requirements)
+    bool validHostname = true;
+    if (newHostname.length() > 31) {
+        validHostname = false;
+        Serial.println("Error: Hostname too long (max 31 characters)");
+    } else {
+        for (int i = 0; i < newHostname.length(); i++) {
+            char c = newHostname.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || 
+                  (c >= '0' && c <= '9') || c == '-')) {
+                validHostname = false;
+                Serial.printf("Error: Invalid character '%c' at position %d\n", c, i+1);
+                break;
+            }
+        }
+        // Hostname cannot start or end with hyphen
+        if (validHostname && (newHostname.charAt(0) == '-' || newHostname.charAt(newHostname.length()-1) == '-')) {
+            validHostname = false;
+            Serial.println("Error: Hostname cannot start or end with hyphen");
+        }
+    }
+    
+    if (!validHostname) {
+        Serial.println("Valid hostname rules:");
+        Serial.println("• 1-31 characters only");
+        Serial.println("• Letters (a-z, A-Z), numbers (0-9), and hyphens (-) only");
+        Serial.println("• Cannot start or end with hyphen");
+        Serial.println("• Examples: dccservo, mycontroller, servo-01");
+        return;
+    }
+    
+    // Check if hostname is already the same
+    if (newHostname == String(wifiConfig.hostname)) {
+        Serial.printf("Hostname is already set to: %s\n", wifiConfig.hostname);
+        return;
+    }
+    
+    // Save old hostname for comparison
+    String oldHostname = String(wifiConfig.hostname);
+    
+    // Update hostname
+    strncpy(wifiConfig.hostname, newHostname.c_str(), WIFI_HOSTNAME_MAX_LENGTH - 1);
+    wifiConfig.hostname[WIFI_HOSTNAME_MAX_LENGTH - 1] = '\0';
+    
+    // Save to EEPROM
+    bootController.isDirty = true;
+    putSettings();
+    saveWiFiConfig();
+    
+    Serial.printf("Hostname updated: %s -> %s\n", oldHostname.c_str(), wifiConfig.hostname);
+    Serial.printf("New mDNS address: %s.local\n", wifiConfig.hostname);
+    
+    // Restart mDNS with new hostname
+    Serial.println("Restarting mDNS with new hostname...");
+    MDNS.end();
+    delay(500);
+    setupMDNS();
+    
+    // Test new mDNS
+    delay(2000);
+    IPAddress resolvedIP = MDNS.queryHost(String(wifiConfig.hostname));
+    if (resolvedIP != IPAddress(0, 0, 0, 0)) {
+        Serial.printf("✓ mDNS active: %s.local -> %s\n", wifiConfig.hostname, resolvedIP.toString().c_str());
+    } else {
+        Serial.printf("⚠ mDNS may need time to propagate: %s.local\n", wifiConfig.hostname);
+    }
+    
+    Serial.println("Hostname change complete!");
 }
 
 void processDccDebugCommand() {
