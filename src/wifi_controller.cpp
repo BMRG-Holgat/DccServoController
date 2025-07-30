@@ -1022,7 +1022,9 @@ void handleServoConfig() {
     html += "  }).then(response => response.json())";
     html += "    .then(data => {";
     html += "      if (data.status === 'success') {";
-    html += "        alert('Configuration saved successfully!');";
+    html += "        alert(data.message);";
+    html += "      } else if (data.status === 'no_changes') {";
+    html += "        alert(data.message);";
     html += "      } else {";
     html += "        alert('Error saving configuration: ' + data.message);";
     html += "      }";
@@ -1104,9 +1106,9 @@ void updateServoConfig() {
                 putSettings();
                 
                 Serial.printf("Servo %d configuration updated\n", servoIndex);
-                webServer.send(200, "application/json", "{\"status\":\"success\"}");
+                webServer.send(200, "application/json", "{\"status\":\"success\",\"message\":\"Configuration saved successfully\"}");
             } else {
-                webServer.send(200, "application/json", "{\"status\":\"no_changes\"}");
+                webServer.send(200, "application/json", "{\"status\":\"no_changes\",\"message\":\"No changes to save\"}");
             }
             return;
         }
@@ -1167,9 +1169,9 @@ void updateServoConfig() {
         putSettings();
         
         Serial.println("All servo configurations updated");
-        webServer.send(200, "application/json", "{\"status\":\"success\"}");
+        webServer.send(200, "application/json", "{\"status\":\"success\",\"message\":\"All configurations saved successfully\"}");
     } else {
-        webServer.send(200, "application/json", "{\"status\":\"no_changes\"}");
+        webServer.send(200, "application/json", "{\"status\":\"no_changes\",\"message\":\"No changes to save\"}");
     }
 }
 

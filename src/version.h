@@ -2,17 +2,17 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "v0.4.1"
+#define SOFTWARE_VERSION "v0.4.2"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 4
-#define VERSION_PATCH 1
+#define VERSION_PATCH 2
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define VERSION_NUMERIC 401
-#define NUMERIC_VERSION 401
+#define VERSION_NUMERIC 402
+#define NUMERIC_VERSION 402
 
 // Build information
-#define BUILD_DATE "2025-01-30"
+#define BUILD_DATE "2025-07-30"
 #define BUILD_TIME __TIME__
 
 // Project information
@@ -22,6 +22,13 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.4.2 (2025-07-30):\n" \
+"  + WEB INTERFACE ERROR MESSAGE IMPROVEMENTS: Fixed 'undefined' error messages\n" \
+"  + Enhanced Save All Configuration to show proper 'No changes to save' message\n" \
+"  + Updated JSON responses to include message field for better user feedback\n" \
+"  + Improved JavaScript error handling to distinguish between success, no-changes, and errors\n" \
+"  + Better user experience with clear status messages in orange for no-changes scenarios\n" \
+"\n" \
 "v0.4.1 (2025-01-30):\n" \
 "  + ENHANCED SERVO OFFSET VALIDATION: Proper 50% swing angle constraint enforcement\n" \
 "  + Added getMaxAllowedOffset() and isValidOffset() helper functions for consistency\n" \
