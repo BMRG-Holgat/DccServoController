@@ -17,8 +17,7 @@
 enum DccWiFiMode {
     DCC_WIFI_OFF = 0,
     DCC_WIFI_AP = 1,
-    DCC_WIFI_STATION = 2,
-    DCC_WIFI_AP_STATION = 3
+    DCC_WIFI_STATION = 2
 };
 
 // WiFi configuration structure for EEPROM

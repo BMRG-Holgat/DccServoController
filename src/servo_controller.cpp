@@ -29,6 +29,19 @@ int8_t getServoNumberFromGpioPin(uint8_t gpioPin) {
     return -1;  // Invalid GPIO pin
 }
 
+// Calculate maximum allowed offset for a given swing angle
+// Offset cannot exceed 50% of swing or the absolute maximum, whichever is smaller
+uint8_t getMaxAllowedOffset(uint8_t swing) {
+    uint8_t halfSwing = swing / 2;
+    return (halfSwing < SERVO_MAX_OFFSET) ? halfSwing : SERVO_MAX_OFFSET;
+}
+
+// Validate if an offset is within allowed range for a given swing
+bool isValidOffset(int8_t offset, uint8_t swing) {
+    uint8_t maxAllowed = getMaxAllowedOffset(swing);
+    return (abs(offset) <= maxAllowed);
+}
+
 // Global timing variables
 unsigned long currentMs;
 unsigned long previousMs;

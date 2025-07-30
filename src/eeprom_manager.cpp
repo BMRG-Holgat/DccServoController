@@ -133,7 +133,7 @@ void loadWiFiConfig() {
     
     // Check if the loaded config appears to be valid (magic number check would be better)
     // For now, check if the mode is within valid range and enabled flag makes sense
-    bool configValid = (tempConfig.mode >= DCC_WIFI_OFF && tempConfig.mode <= DCC_WIFI_AP_STATION);
+    bool configValid = (tempConfig.mode >= DCC_WIFI_OFF && tempConfig.mode <= DCC_WIFI_STATION);
     
     Serial.printf("Config validation: mode valid = %s, AP SSID length = %d\n", 
                   configValid ? "true" : "false", strlen(tempConfig.apSSID));

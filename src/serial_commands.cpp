@@ -135,6 +135,7 @@ void processSerialCommands() {
             Serial.println("Servo numbers: 0-15 (maps to GPIO pins automatically)");
             Serial.println("GPIO pins can also be used directly");
             Serial.println("Speed: 0=Instant, 1=Fast, 2=Normal, 3=Slow");
+            Serial.println("Offset: Maximum ±50% of swing angle (e.g., swing=40° allows ±20° offset)");
             break;
         case 'r':
             Serial.println("Virtual routes not yet implemented");
@@ -201,14 +202,12 @@ void processServoConfigCommand() {
                 break;
             case 4:
                 vsParse.offset = atoi(pch);
-                if ((vsParse.offset < -SERVO_MAX_OFFSET) || (vsParse.offset > SERVO_MAX_OFFSET)) {
+                // Validate offset using the proper validation function
+                if (!isValidOffset(vsParse.offset, vsParse.swing)) {
                     i = 10;
-                    Serial.println("Error: Invalid offset range (-45 to +45 degrees)");
-                }
-                // Additional validation: offset cannot exceed 50% of swing value
-                if (abs(vsParse.offset) > (vsParse.swing / 2)) {
-                    i = 10;
-                    Serial.println("Error: Offset cannot exceed 50% of swing value");
+                    uint8_t maxAllowed = getMaxAllowedOffset(vsParse.swing);
+                    Serial.printf("Error: Offset %d exceeds maximum allowed ±%d degrees (50%% of swing %d)\n", 
+                                  vsParse.offset, maxAllowed, vsParse.swing);
                 }
                 break;
             case 5:
@@ -232,7 +231,8 @@ void processServoConfigCommand() {
     if (i != 8) {
         Serial.println("Error: Invalid command format");
         Serial.println("Usage: s servo,addr,swing,offset,speed,invert,continuous");
-        Serial.println("Note: Offset cannot exceed 50% of swing value");
+        Serial.println("Note: Offset cannot exceed 50% of swing value (e.g., swing=40° allows offset ±20°)");
+        Serial.println("Parameters: servo(0-15), addr(1-2048), swing(1-90°), offset(±degrees), speed(0-3), invert(0/1), continuous(0/1)");
         Serial.println("Speed: 0=Instant, 1=Fast, 2=Normal, 3=Slow");
         Serial.println("Example: s 0,100,25,0,2,0,0  (servo 0, normal speed)");
         Serial.println("Example: s 5,101,30,5,1,0,0  (GPIO 5, fast speed)");
@@ -619,10 +619,7 @@ void processWiFiStatusCommand() {
             Serial.println("Access Point Only");
             break;
         case DCC_WIFI_STATION:
-            Serial.println("Station Only");
-            break;
-        case DCC_WIFI_AP_STATION:
-            Serial.println("AP + Station");
+            Serial.println("Station Only (with AP fallback)");
             break;
         default:
             Serial.println("Unknown");
@@ -632,7 +629,7 @@ void processWiFiStatusCommand() {
     Serial.printf("Enabled: %s\n", wifiConfig.enabled ? "Yes" : "No");
     
     // Access Point information
-    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_AP) {
         Serial.println("\n--- Access Point ---");
         Serial.printf("AP SSID: %s\n", wifiConfig.apSSID);
         Serial.printf("AP IP: %s\n", WiFi.softAPIP().toString().c_str());
@@ -645,7 +642,7 @@ void processWiFiStatusCommand() {
     }
     
     // Station information
-    if (wifiConfig.mode == DCC_WIFI_STATION || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_STATION) {
         Serial.println("\n--- Station ---");
         if (WiFi.status() == WL_CONNECTED) {
             Serial.printf("Connected to: %s\n", WiFi.SSID().c_str());
@@ -709,7 +706,7 @@ void processWiFiStatusCommand() {
     if (WiFi.status() == WL_CONNECTED) {
         Serial.printf("Direct IP: http://%s\n", WiFi.localIP().toString().c_str());
     }
-    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_AP) {
         Serial.printf("AP Direct: http://%s\n", WiFi.softAPIP().toString().c_str());
     }
     Serial.printf("mDNS Link: http://%s.local\n", mdnsHostname.c_str());
@@ -754,7 +751,7 @@ void processMDNSTestCommand() {
         Serial.println("WiFi Status: Not connected to station");
     }
     
-    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_AP) {
         Serial.printf("AP Status: Active (%s)\n", WiFi.softAPIP().toString().c_str());
         Serial.printf("AP Clients: %d\n", WiFi.softAPgetStationNum());
     }
@@ -789,7 +786,7 @@ void processMDNSTestCommand() {
     if (WiFi.status() == WL_CONNECTED) {
         Serial.printf("Direct Station IP: http://%s\n", WiFi.localIP().toString().c_str());
     }
-    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_AP) {
         Serial.printf("Direct AP IP: http://%s\n", WiFi.softAPIP().toString().c_str());
     }
     

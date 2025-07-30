@@ -73,10 +73,6 @@ void initializeWiFi() {
         case DCC_WIFI_STATION:
             setupStation();
             break;
-        case DCC_WIFI_AP_STATION:
-            setupAccessPoint();
-            setupStation();
-            break;
         default:
             Serial.println("WiFi disabled");
             WiFi.mode(WIFI_OFF);
@@ -304,17 +300,16 @@ void handleRoot() {
     switch (wifiConfig.mode) {
         case DCC_WIFI_AP: html += "Access Point"; break;
         case DCC_WIFI_STATION: html += "Station"; break;
-        case DCC_WIFI_AP_STATION: html += "AP + Station"; break;
         default: html += "Disabled"; break;
     }
     html += "</span></div>";
     
-    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_AP) {
         html += "<div class='info-item'><span class='info-label'>AP SSID:</span><span class='info-value'>" + String(wifiConfig.apSSID) + "</span></div>";
         html += "<div class='info-item'><span class='info-label'>AP IP:</span><span class='info-value'>" + WiFi.softAPIP().toString() + "</span></div>";
     }
     
-    if (wifiConfig.mode == DCC_WIFI_STATION || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_STATION) {
         if (WiFi.status() == WL_CONNECTED) {
             html += "<div class='info-item'><span class='info-label'>Connected to:</span><span class='info-value'>" + WiFi.SSID() + "</span></div>";
             html += "<div class='info-item'><span class='info-label'>Station IP:</span><span class='info-value'>" + WiFi.localIP().toString() + "</span></div>";
@@ -334,7 +329,7 @@ void handleRoot() {
     if (WiFi.status() == WL_CONNECTED) {
         html += "<div class='info-item' style='margin-left:20px;'><span class='info-label'>Direct IP:</span><span class='info-value'><a href='http://" + WiFi.localIP().toString() + "' target='_blank'>" + WiFi.localIP().toString() + "</a></span></div>";
     }
-    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_AP) {
         html += "<div class='info-item' style='margin-left:20px;'><span class='info-label'>AP Direct:</span><span class='info-value'><a href='http://" + WiFi.softAPIP().toString() + "' target='_blank'>" + WiFi.softAPIP().toString() + "</a></span></div>";
     }
     html += "<div class='info-item' style='margin-left:20px;'><span class='info-label'>mDNS Link:</span><span class='info-value'><a href='http://" + getMDNSHostname() + ".local' target='_blank'>" + getMDNSHostname() + ".local</a> <small style='color:#888;'>(if supported)</small></span></div>";
@@ -400,8 +395,7 @@ void handleConfig() {
     html += "<select id='mode' name='mode'>";
     html += "<option value='0'" + String(wifiConfig.mode == DCC_WIFI_OFF ? " selected" : "") + ">Disabled</option>";
     html += "<option value='1'" + String(wifiConfig.mode == DCC_WIFI_AP ? " selected" : "") + ">Access Point Only</option>";
-    html += "<option value='2'" + String(wifiConfig.mode == DCC_WIFI_STATION ? " selected" : "") + ">Station Only</option>";
-    html += "<option value='3'" + String(wifiConfig.mode == DCC_WIFI_AP_STATION ? " selected" : "") + ">AP + Station</option>";
+    html += "<option value='2'" + String(wifiConfig.mode == DCC_WIFI_STATION ? " selected" : "") + ">Station Only (with AP fallback)</option>";
     html += "</select>";
     html += "</div>";
     
@@ -631,6 +625,13 @@ void updateWiFiConfig() {
     // Update WiFi mode
     if (webServer.hasArg("mode")) {
         DccWiFiMode newMode = (DccWiFiMode)webServer.arg("mode").toInt();
+        
+        // Handle legacy AP+Station mode (value 3) by converting to Station mode
+        if ((int)newMode == 3) {
+            newMode = DCC_WIFI_STATION;
+            Serial.println("Converted legacy AP+Station mode to Station mode with AP fallback");
+        }
+        
         if (newMode != wifiConfig.mode) {
             wifiConfig.mode = newMode;
             configChanged = true;
@@ -915,7 +916,8 @@ void handleServoConfig() {
         
         html += "<div class='form-group'>";
         html += "<label for='offset" + String(i) + "'>Offset (degrees)</label>";
-        html += "<input type='number' id='offset" + String(i) + "' name='offset" + String(i) + "' value='" + String(virtualservo[i].offset) + "' min='-45' max='45'>";
+        int maxOffset = getMaxAllowedOffset(virtualservo[i].swing);
+        html += "<input type='number' id='offset" + String(i) + "' name='offset" + String(i) + "' value='" + String(virtualservo[i].offset) + "' min='-" + String(maxOffset) + "' max='" + String(maxOffset) + "'>";
         html += "</div>";
         
         html += "<div class='form-group'>";
@@ -1074,7 +1076,7 @@ void updateServoConfig() {
             
             if (webServer.hasArg(offsetParam)) {
                 int newOffset = webServer.arg(offsetParam).toInt();
-                if (newOffset != virtualservo[servoIndex].offset && newOffset >= -45 && newOffset <= 45) {
+                if (newOffset != virtualservo[servoIndex].offset && isValidOffset(newOffset, virtualservo[servoIndex].swing)) {
                     virtualservo[servoIndex].offset = newOffset;
                     configChanged = true;
                 }
@@ -1136,7 +1138,7 @@ void updateServoConfig() {
         
         if (webServer.hasArg(offsetParam)) {
             int newOffset = webServer.arg(offsetParam).toInt();
-            if (newOffset != virtualservo[i].offset && newOffset >= -45 && newOffset <= 45) {
+            if (newOffset != virtualservo[i].offset && isValidOffset(newOffset, virtualservo[i].swing)) {
                 virtualservo[i].offset = newOffset;
                 configChanged = true;
             }
@@ -1301,8 +1303,8 @@ void handleTestWiFi() {
         
         // Update WiFi mode to ensure station mode is enabled
         if (wifiConfig.mode == DCC_WIFI_AP) {
-            wifiConfig.mode = DCC_WIFI_AP_STATION;  // Enable both AP and Station
-            Serial.println("Updated WiFi mode to AP+Station to enable saved credentials");
+            wifiConfig.mode = DCC_WIFI_STATION;  // Switch to Station mode with AP fallback
+            Serial.println("Updated WiFi mode to Station (with AP fallback) to enable saved credentials");
         } else if (wifiConfig.mode == DCC_WIFI_OFF) {
             wifiConfig.mode = DCC_WIFI_STATION;  // Enable Station mode
             Serial.println("Updated WiFi mode to Station to enable saved credentials");
@@ -1471,7 +1473,7 @@ void handleWiFiEvents() {
     if (millis() - lastStatusCheck > 30000) {  // Check every 30 seconds
         lastStatusCheck = millis();
         
-        if (wifiConfig.mode == DCC_WIFI_STATION || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+        if (wifiConfig.mode == DCC_WIFI_STATION) {
             bool isConnected = (WiFi.status() == WL_CONNECTED);
             
             if (!isConnected && strlen(wifiConfig.stationSSID) > 0) {
@@ -1512,13 +1514,13 @@ void printWiFiStatus() {
     Serial.printf("Mode: %d\n", wifiConfig.mode);
     Serial.printf("Enabled: %s\n", wifiConfig.enabled ? "Yes" : "No");
     
-    if (wifiConfig.mode == DCC_WIFI_AP || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_AP) {
         Serial.printf("AP SSID: %s\n", wifiConfig.apSSID);
         Serial.printf("AP IP: %s\n", WiFi.softAPIP().toString().c_str());
         Serial.printf("AP Clients: %d\n", WiFi.softAPgetStationNum());
     }
     
-    if (wifiConfig.mode == DCC_WIFI_STATION || wifiConfig.mode == DCC_WIFI_AP_STATION) {
+    if (wifiConfig.mode == DCC_WIFI_STATION) {
         if (WiFi.status() == WL_CONNECTED) {
             Serial.printf("Station SSID: %s\n", WiFi.SSID().c_str());
             Serial.printf("Station IP: %s\n", WiFi.localIP().toString().c_str());

@@ -38,6 +38,7 @@ const uint8_t numChars = 32;
 
 // Servo constants
 #define SERVO_CENTER_POSITION 90  // Default center position (degrees)
-#define SERVO_MAX_OFFSET 45       // Maximum offset from center (+/- degrees)
+#define SERVO_MAX_OFFSET 45       // Absolute maximum offset from center (+/- degrees)
+                                  // Note: Actual offset limit is 50% of swing angle, whichever is smaller
 
 #endif // CONFIG_H

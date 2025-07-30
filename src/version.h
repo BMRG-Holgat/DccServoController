@@ -2,17 +2,17 @@
 #define VERSION_H
 
 // Software version information
-#define SOFTWARE_VERSION "v0.4.0"
+#define SOFTWARE_VERSION "v0.4.1"
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 4
-#define VERSION_PATCH 0
+#define VERSION_PATCH 1
 
 // Numeric version for EEPROM compatibility (MAJOR*100 + MINOR*10 + PATCH)
-#define VERSION_NUMERIC 400
-#define NUMERIC_VERSION 400
+#define VERSION_NUMERIC 401
+#define NUMERIC_VERSION 401
 
 // Build information
-#define BUILD_DATE "2025-01-29"
+#define BUILD_DATE "2025-01-30"
 #define BUILD_TIME __TIME__
 
 // Project information
@@ -22,6 +22,17 @@
 
 // Version history and features
 #define VERSION_HISTORY \
+"v0.4.1 (2025-01-30):\n" \
+"  + ENHANCED SERVO OFFSET VALIDATION: Proper 50% swing angle constraint enforcement\n" \
+"  + Added getMaxAllowedOffset() and isValidOffset() helper functions for consistency\n" \
+"  + Updated serial commands with improved validation and detailed error messages\n" \
+"  + Fixed web interface to use dynamic offset limits based on individual servo swing\n" \
+"  + WIFI ARCHITECTURE IMPROVEMENT: Removed AP+Station mode (ESP32 limitation)\n" \
+"  + Implemented automatic AP fallback when station connection fails\n" \
+"  + Added legacy mode conversion for backward compatibility\n" \
+"  + Enhanced all WiFi status displays and configuration interfaces\n" \
+"  + Improved offset validation consistency across serial, web, and EEPROM interfaces\n" \
+"\n" \
 "v0.4.0 (2025-01-29):\n" \
 "  + MAJOR CODE REFACTORING: Improved architecture and maintainability\n" \
 "  + Created Hardware Abstraction Layer with LedController class\n" \

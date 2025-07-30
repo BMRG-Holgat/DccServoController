@@ -48,6 +48,10 @@ extern const uint8_t pwmPins[TOTAL_PINS];
 uint8_t getGpioPinFromServoNumber(uint8_t servoNumber);
 int8_t getServoNumberFromGpioPin(uint8_t gpioPin);
 
+// Offset validation function
+uint8_t getMaxAllowedOffset(uint8_t swing);
+bool isValidOffset(int8_t offset, uint8_t swing);
+
 // Global timing variables
 extern unsigned long currentMs;
 extern unsigned long previousMs;
